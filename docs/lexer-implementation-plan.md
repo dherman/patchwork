@@ -106,27 +106,36 @@
 
 ---
 
-## Milestone 4: Full Example Validation
+## Milestone 4: Full Example Validation ✓
 
 **Goal:** Successfully lex all historian examples and handle real-world patterns
 
 ### Bash substitution
-- [ ] Implement `$(...)` token pattern for bash command substitution
-- [ ] Write unit tests for bash substitution
+- [x] Implement `$(...)` token pattern for bash command substitution
+- [x] Write unit tests for bash substitution
 
 ### Example file testing
-- [ ] Test lexer on `examples/historian/main.pw`
-- [ ] Test lexer on `examples/historian/analyst.pw`
-- [ ] Test lexer on `examples/historian/narrator.pw`
-- [ ] Test lexer on `examples/historian/scribe.pw`
+- [x] Test lexer on `examples/historian/main.pw`
+- [x] Test lexer on `examples/historian/analyst.pw`
+- [x] Test lexer on `examples/historian/narrator.pw`
+- [x] Test lexer on `examples/historian/scribe.pw`
 
 ### Edge case refinement
-- [ ] Identify and fix any tokenization errors from example files
-- [ ] Refine token set based on actual usage patterns
-- [ ] Document any modifications made to example files
-- [ ] Add unit tests for discovered edge cases
+- [x] Identify and fix any tokenization errors from example files
+- [x] Refine token set based on actual usage patterns
+- [x] Add unit tests for discovered edge cases
 
 ### Final validation
-- [ ] Verify all examples tokenize without errors
-- [ ] Review token streams for parser readiness
-- [ ] Document any known limitations or future work
+- [x] Verify all examples tokenize without errors
+- [x] Review token streams for parser readiness
+
+**Key learnings:**
+- Bash substitution pattern `\$\([^\)]*\)` works well for simple cases
+- All historian examples tokenize successfully with existing token set
+- No modifications to example files were needed
+- Lexer is ready for parser implementation
+
+**Future work (beyond lexer scope):**
+- String interpolation `${}` inside strings (deferred to parser)
+- Nested bash substitution (not needed for current examples)
+- Better error recovery for unclosed delimiters

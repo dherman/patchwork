@@ -654,4 +654,104 @@ var session_id = "historian-${timestamp}""#;
         ]);
         Ok(())
     }
+
+    #[test]
+    fn test_bash_substitution() -> Result<(), ParlexError> {
+        let input = r#"var timestamp = $(date +%Y%m%d-%H%M%S)"#;
+        let tokens = collect_tokens(input)?;
+
+        assert_eq!(tokens, vec![
+            Rule::Var,
+            Rule::Whitespace,
+            Rule::Identifier,  // timestamp
+            Rule::Whitespace,
+            Rule::Assign,
+            Rule::Whitespace,
+            Rule::BashSubst,  // $(date +%Y%m%d-%H%M%S)
+            Rule::End
+        ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_bash_substitution_complex() -> Result<(), ParlexError> {
+        let input = r#"var current_branch = $(git rev_parse --abbrev_ref HEAD)"#;
+        let tokens = collect_tokens(input)?;
+
+        assert_eq!(tokens, vec![
+            Rule::Var,
+            Rule::Whitespace,
+            Rule::Identifier,  // current_branch
+            Rule::Whitespace,
+            Rule::Assign,
+            Rule::Whitespace,
+            Rule::BashSubst,  // $(git rev_parse --abbrev_ref HEAD)
+            Rule::End
+        ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_historian_main_example() -> Result<(), ParlexError> {
+        let input = include_str!("../../../examples/historian/main.pw");
+        let tokens = collect_tokens(input)?;
+
+        // Just verify it tokenizes without error
+        // Should contain various expected token types
+        assert!(tokens.contains(&Rule::Import));
+        assert!(tokens.contains(&Rule::Skill));
+        assert!(tokens.contains(&Rule::Var));
+        assert!(tokens.contains(&Rule::BashSubst));
+        assert!(tokens.contains(&Rule::String));
+        assert!(tokens.contains(&Rule::Await));
+        assert!(tokens.contains(&Rule::Task));
+        assert!(tokens.contains(&Rule::End));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_historian_analyst_example() -> Result<(), ParlexError> {
+        let input = include_str!("../../../examples/historian/analyst.pw");
+        let tokens = collect_tokens(input)?;
+
+        // Should tokenize without error
+        assert!(tokens.contains(&Rule::Import));
+        assert!(tokens.contains(&Rule::Task));
+        assert!(tokens.contains(&Rule::Think));
+        assert!(tokens.contains(&Rule::Ask));
+        assert!(tokens.contains(&Rule::End));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_historian_narrator_example() -> Result<(), ParlexError> {
+        let input = include_str!("../../../examples/historian/narrator.pw");
+        let tokens = collect_tokens(input)?;
+
+        // Should tokenize without error
+        assert!(tokens.contains(&Rule::Import));
+        assert!(tokens.contains(&Rule::Task));
+        assert!(tokens.contains(&Rule::Fun));
+        assert!(tokens.contains(&Rule::Think));
+        assert!(tokens.contains(&Rule::End));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_historian_scribe_example() -> Result<(), ParlexError> {
+        let input = include_str!("../../../examples/historian/scribe.pw");
+        let tokens = collect_tokens(input)?;
+
+        // Should tokenize without error
+        assert!(tokens.contains(&Rule::Import));
+        assert!(tokens.contains(&Rule::Task));
+        assert!(tokens.contains(&Rule::Think));
+        assert!(tokens.contains(&Rule::Do));
+        assert!(tokens.contains(&Rule::End));
+
+        Ok(())
+    }
 }

@@ -67,6 +67,8 @@ Ampersand: <Code> &
 Dot: <Code> \.
 String: <Code> \"([^\"\\\n]|\\.)*\"
 
+BashSubst: <Code> \$\([^\)]*\)
+
 Identifier: <Code> {{ID}}
 
 Comment: <Code> # [^\n]*
