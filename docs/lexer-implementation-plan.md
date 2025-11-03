@@ -144,25 +144,26 @@
 ### String Literal Types in Code Context
 
 #### Double-quoted strings (interpolated)
-- [ ] Replace single `String` token with chunked tokenization
-- [ ] Emit `StringStart` token for opening `"`
-- [ ] Emit `StringText` tokens for literal text segments
-- [ ] Emit `StringEnd` token for closing `"`
-- [ ] Implement `\$` escape sequence (literal dollar sign)
-- [ ] Implement other escape sequences (`\n`, `\t`, `\r`, `\\`, `\"`)
-- [ ] Write unit tests for basic double-quoted strings
+- [x] Replace single `String` token with chunked tokenization
+- [x] Emit `StringStart` token for opening `"`
+- [x] Emit `StringText` tokens for literal text segments
+- [x] Emit `StringEnd` token for closing `"`
+- [x] Implement escape sequences (`\n`, `\t`, `\r`, `\\`, `\"`) - handled by ALEX pattern
+- [ ] Implement `\$` escape sequence (literal dollar sign) - deferred
+- [x] Write unit tests for basic double-quoted strings
 
 #### Interpolation patterns in double-quoted strings
-- [ ] Recognize `$identifier` pattern (e.g., `"Hello $name"`)
+- [x] Recognize `$identifier` pattern (e.g., `"Hello $name"`)
   - Emit `Dollar` token followed by `Identifier`
-  - Dollar not followed by valid start means literal `$` character
-- [ ] Recognize `${expression}` pattern (e.g., `"Total: ${x + y}"`)
+  - Driver switches back to InString mode after identifier
+- [x] Recognize `${expression}` pattern (e.g., `"Total: ${x + y}"`)
   - Emit `Dollar`, `LBrace`, tokenize expression in Code context, `RBrace`
-  - Track brace depth for nested expressions
-- [ ] Recognize `$(command)` pattern inside strings (e.g., `"Date: $(date)"`)
-  - Already have `BashSubst` token, ensure it works inside strings
-  - Or emit `Dollar`, `LParen`, content, `RParen`
-- [ ] Write unit tests for each interpolation pattern
+  - Track brace depth for nested expressions with delimiter stack
+- [x] Recognize `$(command)` pattern inside strings (e.g., `"Date: $(date)"`)
+  - Removed `BashSubst` token, now tokenizes as individual tokens
+  - Emit `Dollar`, `LParen`, content, `RParen` with state tracking
+- [x] Write unit tests for each interpolation pattern
+- [x] Support arbitrary nesting depth of `${...}` and `$(...)` forms
 
 #### Single-quoted strings (literal, no interpolation)
 - [ ] Implement `SingleQuoteString` token for `'...'` literals
@@ -189,28 +190,30 @@
 ### State Management
 
 #### String state tracking
-- [ ] Add `InString` mode to lexer states (alongside Code and Prompt)
-- [ ] Track string delimiter type (double-quote vs single-quote)
-- [ ] Maintain state stack for nested interpolations: `String → Expression → String`
+- [x] Add `InString` mode to lexer states (alongside Code and Prompt)
+- [x] Maintain state stack for nested interpolations: `String → Expression → String`
+- [x] Track delimiter type (Brace vs Paren) to distinguish `${...}` from `$(...)`
+- [ ] Track string delimiter type (double-quote vs single-quote) - pending single-quote support
 
 #### Interpolation state transitions
-- [ ] Code string interpolation: `Code (String) → ${ → Code (Expression) → } → Code (String)`
+- [x] Code string interpolation: `Code (String) → ${ → Code (Expression) → } → Code (String)`
+- [x] Handle nested cases: `"Outer ${f("Inner ${x}")} text"`
+- [x] Handle mixed nesting: `"Result: ${x + $(cmd)}"` and `"A: ${a + $(b + ${c})}"`
 - [ ] Prompt interpolation: `Prompt → ${ → Code (Expression) → } → Prompt`
-- [ ] Handle nested cases: `"Outer ${f("Inner ${x}")} text"`
 
 ### Token Set Updates
 
 #### New token types
-- [ ] `StringStart` - opening `"` for interpolated string
-- [ ] `StringText` - literal text chunk within string
-- [ ] `StringEnd` - closing `"` for interpolated string
+- [x] `StringStart` - opening `"` for interpolated string
+- [x] `StringText` - literal text chunk within string
+- [x] `StringEnd` - closing `"` for interpolated string
+- [x] `Dollar` - interpolation prefix `$` (active in both Code and InString modes)
 - [ ] `SingleQuoteString` - complete single-quoted literal
-- [ ] `Dollar` - interpolation prefix `$`
 - [ ] Consider: `BackslashEscape` for explicit escape tokens
 
 #### Modified tokens
-- [ ] Keep existing `String` token for backward compatibility initially
-- [ ] Phase out or deprecate in favor of chunked tokens
+- [x] Removed `String` token entirely in favor of chunked tokenization
+- [x] Removed `BashSubst` token - now tokenizes as `Dollar`, `LParen`, ..., `RParen`
 
 ### Example Test Cases
 
@@ -260,17 +263,24 @@ think {
 - [ ] Ensure backward compatibility where needed
 
 #### Comprehensive test suite
-- [ ] Test escape sequences in double-quoted strings
-- [ ] Test all three interpolation forms (`$id`, `${expr}`, `$(cmd)`)
-- [ ] Test nested interpolations (string in expression in string)
+- [x] Test escape sequences in double-quoted strings
+- [x] Test all three interpolation forms (`$id`, `${expr}`, `$(cmd)`)
+- [x] Test nested interpolations (string in expression in string)
+- [x] Test deeply nested mixed interpolations
+- [x] Test edge cases (empty strings, only interpolation, multiple interpolations)
 - [ ] Test single-quoted strings (no interpolation)
 - [ ] Test prompt context interpolations
-- [ ] Test edge cases (empty strings, only interpolation, etc.)
 
 #### Example file validation
-- [ ] Update historian examples if they use string interpolation
-- [ ] Create new example files demonstrating interpolation features
-- [ ] Verify all examples still tokenize correctly
+- [x] Verify all historian examples still tokenize correctly (42 tests pass)
+
+**Key learnings:**
+- Driver-based state switching is superior to ALEX patterns for complex interpolation
+- Single-token patterns like `BashSubst` prevent proper state tracking for nested contexts
+- `DelimiterType` enum is essential to distinguish `${...}` (waiting for `}`) from `$(...)` (waiting for `)`)
+- After popping a delimiter, must check parent mode stack to determine if still nested
+- For `${func(...)}`, the `)` is just part of the expression, not the end of interpolation
+- All 8 interpolation tests pass, including triple-level nesting: `"A: ${a + $(b + ${c})}"`
 
 ### Implementation Strategy
 
