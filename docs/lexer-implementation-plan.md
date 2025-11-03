@@ -133,9 +133,164 @@
 - Bash substitution pattern `\$\([^\)]*\)` works well for simple cases
 - All historian examples tokenize successfully with existing token set
 - No modifications to example files were needed
-- Lexer is ready for parser implementation
+- Basic lexer complete, ready for string interpolation enhancement
 
-**Future work (beyond lexer scope):**
-- String interpolation `${}` inside strings (deferred to parser)
-- Nested bash substitution (not needed for current examples)
-- Better error recovery for unclosed delimiters
+---
+
+## Milestone 5: String Interpolation & Escaping
+
+**Goal:** Implement proper string interpolation and escaping in both Code and Prompt contexts
+
+### String Literal Types in Code Context
+
+#### Double-quoted strings (interpolated)
+- [ ] Replace single `String` token with chunked tokenization
+- [ ] Emit `StringStart` token for opening `"`
+- [ ] Emit `StringText` tokens for literal text segments
+- [ ] Emit `StringEnd` token for closing `"`
+- [ ] Implement `\$` escape sequence (literal dollar sign)
+- [ ] Implement other escape sequences (`\n`, `\t`, `\r`, `\\`, `\"`)
+- [ ] Write unit tests for basic double-quoted strings
+
+#### Interpolation patterns in double-quoted strings
+- [ ] Recognize `$identifier` pattern (e.g., `"Hello $name"`)
+  - Emit `Dollar` token followed by `Identifier`
+  - Dollar not followed by valid start means literal `$` character
+- [ ] Recognize `${expression}` pattern (e.g., `"Total: ${x + y}"`)
+  - Emit `Dollar`, `LBrace`, tokenize expression in Code context, `RBrace`
+  - Track brace depth for nested expressions
+- [ ] Recognize `$(command)` pattern inside strings (e.g., `"Date: $(date)"`)
+  - Already have `BashSubst` token, ensure it works inside strings
+  - Or emit `Dollar`, `LParen`, content, `RParen`
+- [ ] Write unit tests for each interpolation pattern
+
+#### Single-quoted strings (literal, no interpolation)
+- [ ] Implement `SingleQuoteString` token for `'...'` literals
+- [ ] No interpolation or escape sequences except `\'` and `\\`
+- [ ] Write unit tests for single-quoted strings
+
+### Interpolation in Prompt Context
+
+#### Direct interpolation (no quotes needed)
+- [ ] Recognize `$identifier` in Prompt context
+  - Convert `PromptText` followed by `$identifier` to separate tokens
+- [ ] Recognize `${expression}` in Prompt context
+  - Emit `Dollar`, `LBrace`, switch to Code context, tokenize expression, `RBrace`
+  - Track brace depth and return to Prompt context
+- [ ] Recognize `$(command)` in Prompt context
+  - Emit `Dollar`, `LParen`, tokenize bash command, `RParen`
+- [ ] Write unit tests for prompt interpolation
+
+#### Escaping in prompts
+- [ ] Implement `\$` escape in Prompt context (literal dollar sign)
+- [ ] Handle other useful escapes (`\{`, `\}`, `\\`)
+- [ ] Write unit tests for prompt escaping
+
+### State Management
+
+#### String state tracking
+- [ ] Add `InString` mode to lexer states (alongside Code and Prompt)
+- [ ] Track string delimiter type (double-quote vs single-quote)
+- [ ] Maintain state stack for nested interpolations: `String → Expression → String`
+
+#### Interpolation state transitions
+- [ ] Code string interpolation: `Code (String) → ${ → Code (Expression) → } → Code (String)`
+- [ ] Prompt interpolation: `Prompt → ${ → Code (Expression) → } → Prompt`
+- [ ] Handle nested cases: `"Outer ${f("Inner ${x}")} text"`
+
+### Token Set Updates
+
+#### New token types
+- [ ] `StringStart` - opening `"` for interpolated string
+- [ ] `StringText` - literal text chunk within string
+- [ ] `StringEnd` - closing `"` for interpolated string
+- [ ] `SingleQuoteString` - complete single-quoted literal
+- [ ] `Dollar` - interpolation prefix `$`
+- [ ] Consider: `BackslashEscape` for explicit escape tokens
+
+#### Modified tokens
+- [ ] Keep existing `String` token for backward compatibility initially
+- [ ] Phase out or deprecate in favor of chunked tokens
+
+### Example Test Cases
+
+#### Code context examples
+```patchwork
+# Simple interpolation
+"Hello $name"  # → StringStart, StringText("Hello "), Dollar, Identifier(name), StringEnd
+
+# Expression interpolation
+"Total: ${x + y}"  # → StringStart, StringText("Total: "), Dollar, LBrace, Identifier(x), Plus, Identifier(y), RBrace, StringEnd
+
+# Command substitution
+"Date: $(date)"  # → StringStart, StringText("Date: "), Dollar, LParen, Identifier(date), RParen, StringEnd
+
+# Escaped dollar
+"Price: \$100"  # → StringStart, StringText("Price: $100"), StringEnd
+
+# Nested interpolation
+"Outer ${f("inner")}"  # → StringStart, StringText("Outer "), Dollar, LBrace, Identifier(f), LParen, StringStart, StringText("inner"), StringEnd, RParen, RBrace, StringEnd
+
+# Single-quoted (no interpolation)
+'Literal $var text'  # → SingleQuoteString("Literal $var text")
+```
+
+#### Prompt context examples
+```patchwork
+think {
+    Analyze $filename and check ${x + y} items
+}
+# Inside prompt:
+# → PromptText("Analyze"), Whitespace, Dollar, Identifier(filename),
+#   Whitespace, PromptText("and"), Whitespace, PromptText("check"), Whitespace,
+#   Dollar, LBrace, Identifier(x), Plus, Identifier(y), RBrace,
+#   Whitespace, PromptText("items")
+
+think {
+    Price is \$100
+}
+# → PromptText("Price"), Whitespace, PromptText("is"), Whitespace, PromptText("$100")
+```
+
+### Integration & Testing
+
+#### Update existing tests
+- [ ] Audit current `String` token tests
+- [ ] Update or extend for new chunked tokenization
+- [ ] Ensure backward compatibility where needed
+
+#### Comprehensive test suite
+- [ ] Test escape sequences in double-quoted strings
+- [ ] Test all three interpolation forms (`$id`, `${expr}`, `$(cmd)`)
+- [ ] Test nested interpolations (string in expression in string)
+- [ ] Test single-quoted strings (no interpolation)
+- [ ] Test prompt context interpolations
+- [ ] Test edge cases (empty strings, only interpolation, etc.)
+
+#### Example file validation
+- [ ] Update historian examples if they use string interpolation
+- [ ] Create new example files demonstrating interpolation features
+- [ ] Verify all examples still tokenize correctly
+
+### Implementation Strategy
+
+**Recommended order:**
+1. Start with double-quoted string chunking (StringStart, StringText, StringEnd)
+2. Add simple `$identifier` interpolation in strings
+3. Add `${expression}` with brace tracking
+4. Implement escaping (`\$`, `\n`, etc.)
+5. Add single-quoted strings
+6. Extend to Prompt context interpolation
+7. Handle nested cases
+8. Comprehensive testing
+
+**Key challenges:**
+- State management for nested contexts (string → expression → string)
+- Brace depth tracking in expressions
+- Escape sequence handling
+- Differentiating `$` followed by identifier vs `$` as literal
+
+**Future considerations:**
+- Raw strings (no escaping at all) - `r"literal\n"`?
+- Multi-line strings with proper indentation handling?
+- Format string mini-language (like Python f-strings)?
