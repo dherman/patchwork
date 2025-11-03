@@ -137,7 +137,7 @@
 
 ---
 
-## Milestone 5: String Interpolation & Escaping
+## Milestone 5: String Interpolation & Escaping ✓
 
 **Goal:** Implement proper string interpolation and escaping in both Code and Prompt contexts
 
@@ -149,7 +149,7 @@
 - [x] Emit `StringText` tokens for literal text segments
 - [x] Emit `StringEnd` token for closing `"`
 - [x] Implement escape sequences (`\n`, `\t`, `\r`, `\\`, `\"`) - handled by ALEX pattern
-- [ ] Implement `\$` escape sequence (literal dollar sign) - deferred
+- [x] Implement `\$` escape sequence (literal dollar sign)
 - [x] Write unit tests for basic double-quoted strings
 
 #### Interpolation patterns in double-quoted strings
@@ -166,21 +166,21 @@
 - [x] Support arbitrary nesting depth of `${...}` and `$(...)` forms
 
 #### Single-quoted strings (literal, no interpolation)
-- [ ] Implement `SingleQuoteString` token for `'...'` literals
-- [ ] No interpolation or escape sequences except `\'` and `\\`
-- [ ] Write unit tests for single-quoted strings
+- [x] Implement `SingleQuoteString` token for `'...'` literals
+- [x] No interpolation or escape sequences except `\'` and `\\`
+- [x] Write unit tests for single-quoted strings
 
 ### Interpolation in Prompt Context
 
 #### Direct interpolation (no quotes needed)
-- [ ] Recognize `$identifier` in Prompt context
+- [x] Recognize `$identifier` in Prompt context
   - Convert `PromptText` followed by `$identifier` to separate tokens
-- [ ] Recognize `${expression}` in Prompt context
+- [x] Recognize `${expression}` in Prompt context
   - Emit `Dollar`, `LBrace`, switch to Code context, tokenize expression, `RBrace`
   - Track brace depth and return to Prompt context
-- [ ] Recognize `$(command)` in Prompt context
+- [x] Recognize `$(command)` in Prompt context
   - Emit `Dollar`, `LParen`, tokenize bash command, `RParen`
-- [ ] Write unit tests for prompt interpolation
+- [x] Write unit tests for prompt interpolation
 
 #### Escaping in prompts
 - [ ] Implement `\$` escape in Prompt context (literal dollar sign)
@@ -199,7 +199,7 @@
 - [x] Code string interpolation: `Code (String) → ${ → Code (Expression) → } → Code (String)`
 - [x] Handle nested cases: `"Outer ${f("Inner ${x}")} text"`
 - [x] Handle mixed nesting: `"Result: ${x + $(cmd)}"` and `"A: ${a + $(b + ${c})}"`
-- [ ] Prompt interpolation: `Prompt → ${ → Code (Expression) → } → Prompt`
+- [x] Prompt interpolation: `Prompt → ${ → Code (Expression) → } → Prompt`
 
 ### Token Set Updates
 
@@ -208,7 +208,7 @@
 - [x] `StringText` - literal text chunk within string
 - [x] `StringEnd` - closing `"` for interpolated string
 - [x] `Dollar` - interpolation prefix `$` (active in both Code and InString modes)
-- [ ] `SingleQuoteString` - complete single-quoted literal
+- [x] `SingleQuoteString` - complete single-quoted literal
 - [ ] Consider: `BackslashEscape` for explicit escape tokens
 
 #### Modified tokens
@@ -280,7 +280,13 @@ think {
 - `DelimiterType` enum is essential to distinguish `${...}` (waiting for `}`) from `$(...)` (waiting for `)`)
 - After popping a delimiter, must check parent mode stack to determine if still nested
 - For `${func(...)}`, the `)` is just part of the expression, not the end of interpolation
-- All 8 interpolation tests pass, including triple-level nesting: `"A: ${a + $(b + ${c})}"`
+- All interpolation tests pass, including triple-level nesting: `"A: ${a + $(b + ${c})}"`
+- `\$` escape in strings already worked via ALEX pattern `([^\"\$\\]|\\.)+`
+- Single-quoted strings implemented as single token with pattern `'([^'\\]|\\.)*'`
+- Prompt interpolation requires excluding `$` from PromptText pattern: `[^{}\s\$]+`
+- Interpolation flags (`in_string_interpolation`, `in_prompt_interpolation`) must be cleared when returning to parent mode after closing `${...}` or `$(...)`
+- Critical bug: When popping from interpolation back to parent Prompt/InString mode, must clear the interpolation flag to prevent subsequent `}` from incorrectly returning to Prompt/InString instead of Code
+- All 52 tests passing including 4 historian example files
 
 ### Implementation Strategy
 

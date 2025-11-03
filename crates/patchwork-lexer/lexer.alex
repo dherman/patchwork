@@ -9,7 +9,9 @@ Newline: <Code,Prompt> {{NL}}
 StringStart: <Code> \"
 StringEnd: <InString> \"
 StringText: <InString> ([^\"\$\\]|\\.)+
-Dollar: <Code,InString> \$
+Dollar: <Code,InString,Prompt> \$
+
+SingleQuoteString: <Code> '([^'\\]|\\.)*'
 
 Think: <Code> think
 Ask: <Code> ask
@@ -47,8 +49,8 @@ OrOr: <Code> \|\|
 
 LBrace: <Code,Prompt> \{
 RBrace: <Code,Prompt> \}
-LParen: <Code> \(
-RParen: <Code> \)
+LParen: <Code,Prompt> \(
+RParen: <Code,Prompt> \)
 LBracket: <Code> \[
 RBracket: <Code> \]
 Semicolon: <Code> ;
@@ -75,6 +77,6 @@ Identifier: <Code> {{ID}}
 
 Comment: <Code> # [^\n]*
 
-PromptText: <Prompt> [^{}\s]+
+PromptText: <Prompt> [^{}\s\$]+
 
 ErrorAny: <*> .

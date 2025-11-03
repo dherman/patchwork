@@ -28,6 +28,8 @@ pub struct LexerContext {
     last_token: Option<Rule>,
     /// Track if we just saw a Dollar in InString mode (for interpolation)
     in_string_interpolation: bool,
+    /// Track if we just saw a Dollar in Prompt mode (for interpolation)
+    in_prompt_interpolation: bool,
 }
 
 impl LexerContext {
@@ -38,6 +40,7 @@ impl LexerContext {
             delimiter_stack: vec![],
             last_token: None,
             in_string_interpolation: false,
+            in_prompt_interpolation: false,
         }
     }
 
@@ -165,7 +168,7 @@ where
                 return Ok(());
             }
             Rule::Dollar => {
-                // When we see $ in InString mode, we need to check what follows
+                // When we see $ in InString or Prompt mode, we need to check what follows
                 // If it's { or (, we'll handle that in LBrace/LParen
                 // If it's an identifier, we temporarily switch to Code mode
                 let span = lexer.span();
@@ -173,9 +176,16 @@ where
                 lexer.yield_token(token);
 
                 // Mark that we're in interpolation mode - next token should be in Code mode
-                if lexer.mode() == Mode::InString {
-                    context.in_string_interpolation = true;
-                    lexer.begin(Mode::Code);
+                match lexer.mode() {
+                    Mode::InString => {
+                        context.in_string_interpolation = true;
+                        lexer.begin(Mode::Code);
+                    }
+                    Mode::Prompt => {
+                        context.in_prompt_interpolation = true;
+                        lexer.begin(Mode::Code);
+                    }
+                    _ => {}
                 }
                 context.last_token = Some(rule);
                 return Ok(());
@@ -190,6 +200,19 @@ where
                 // Return to InString mode
                 context.in_string_interpolation = false;
                 lexer.begin(Mode::InString);
+                context.last_token = None;
+                return Ok(());
+            }
+            Rule::Identifier if context.in_prompt_interpolation && context.last_token == Some(Rule::Dollar) => {
+                // We're tokenizing an identifier directly after $ in a prompt (simple $id case)
+                // This is NOT ${...}, so return to Prompt mode after identifier
+                let span = lexer.span();
+                let token = PatchworkToken::new(rule, Some(span));
+                lexer.yield_token(token);
+
+                // Return to Prompt mode
+                context.in_prompt_interpolation = false;
+                lexer.begin(Mode::Prompt);
                 context.last_token = None;
                 return Ok(());
             }
@@ -224,6 +247,11 @@ where
                         context.push_mode(Mode::Code, DelimiterType::Brace);
                         // Stay in Code mode (already there from Dollar handling)
                     }
+                    Some(Rule::Dollar) if context.in_prompt_interpolation => {
+                        // ${expression} in prompt - stay in Code mode and track depth
+                        context.push_mode(Mode::Code, DelimiterType::Brace);
+                        // Stay in Code mode (already there from Dollar handling)
+                    }
                     _ => {
                         // Just increment depth for nested braces
                         context.increment_depth();
@@ -233,21 +261,21 @@ where
                 return Ok(());
             }
             Rule::LParen if context.last_token == Some(Rule::Dollar) => {
-                // $(command) - either in string interpolation or plain Code context
+                // $(command) - either in string/prompt interpolation or plain Code context
                 let span = lexer.span();
                 let token = PatchworkToken::new(rule, Some(span));
                 lexer.yield_token(token);
 
-                if context.in_string_interpolation {
-                    // $(command) in string - push Code mode and track depth
+                if context.in_string_interpolation || context.in_prompt_interpolation {
+                    // $(command) in string or prompt - push Code mode and track depth
                     context.push_mode(Mode::Code, DelimiterType::Paren);  // Waiting for )
                     // Stay in Code mode (already there from Dollar handling)
                 }
-                // If not in string interpolation, we're in plain Code mode - no state change needed
+                // If not in string/prompt interpolation, we're in plain Code mode - no state change needed
                 context.last_token = None;
                 return Ok(());
             }
-            Rule::RParen if context.in_string_interpolation => {
+            Rule::RParen if context.in_string_interpolation || context.in_prompt_interpolation => {
                 let span = lexer.span();
                 let token = PatchworkToken::new(rule, Some(span));
                 lexer.yield_token(token);
@@ -262,9 +290,14 @@ where
                                 // Still nested - return to parent mode (could be Code from ${...})
                                 lexer.begin(parent_mode);
                             } else {
-                                // No more nesting - return to InString mode
-                                context.in_string_interpolation = false;
-                                lexer.begin(Mode::InString);
+                                // No more nesting - return to original mode (InString or Prompt)
+                                if context.in_string_interpolation {
+                                    context.in_string_interpolation = false;
+                                    lexer.begin(Mode::InString);
+                                } else if context.in_prompt_interpolation {
+                                    context.in_prompt_interpolation = false;
+                                    lexer.begin(Mode::Prompt);
+                                }
                             }
                         }
                     }
@@ -286,13 +319,26 @@ where
                     if let Some(_prev_mode) = context.pop_mode() {
                         // If we had a mode on stack, we need to return to the mode before that
                         if let Some(&parent_mode) = context.mode_stack.last() {
+                            // Returning to a parent mode after closing interpolation/block
+                            // Clear the interpolation flag if we're done with interpolation
+                            if parent_mode == Mode::InString && context.in_string_interpolation {
+                                // Finished ${...} or $(...) in string, back to parent string
+                                context.in_string_interpolation = false;
+                            } else if parent_mode == Mode::Prompt && context.in_prompt_interpolation {
+                                // Finished ${...} or $(...) in prompt, back to parent prompt
+                                context.in_prompt_interpolation = false;
+                            }
                             lexer.begin(parent_mode);
                         } else {
-                            // Back to Code or InString mode
+                            // Back to Code, InString, or Prompt mode
                             if context.in_string_interpolation {
                                 // Closing ${...} - return to InString
                                 context.in_string_interpolation = false;
                                 lexer.begin(Mode::InString);
+                            } else if context.in_prompt_interpolation {
+                                // Closing ${...} - return to Prompt
+                                context.in_prompt_interpolation = false;
+                                lexer.begin(Mode::Prompt);
                             } else {
                                 lexer.begin(Mode::Code);
                             }
@@ -1125,6 +1171,185 @@ var session_id = "historian-${timestamp}""#;
             Rule::StringEnd,
             Rule::End
         ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_string_escaped_dollar() -> Result<(), ParlexError> {
+        // Test \$ escape for literal dollar sign
+        let tokens = collect_tokens(r#""Price: \$100""#)?;
+        assert_eq!(tokens, vec![
+            Rule::StringStart,
+            Rule::StringText,  // "Price: \$100" - includes escaped dollar
+            Rule::StringEnd,
+            Rule::End
+        ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_string_escaped_dollar_mixed() -> Result<(), ParlexError> {
+        // Test \$ escape mixed with actual interpolation
+        let tokens = collect_tokens(r#""Price: \$${amount}""#)?;
+        assert_eq!(tokens, vec![
+            Rule::StringStart,
+            Rule::StringText,  // "Price: \$"
+            Rule::Dollar,
+            Rule::LBrace,
+            Rule::Identifier,  // amount
+            Rule::RBrace,
+            Rule::StringEnd,
+            Rule::End
+        ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_single_quote_string_simple() -> Result<(), ParlexError> {
+        // Test simple single-quoted string
+        let tokens = collect_tokens(r#"'hello world'"#)?;
+        assert_eq!(tokens, vec![
+            Rule::SingleQuoteString,
+            Rule::End
+        ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_single_quote_string_no_interpolation() -> Result<(), ParlexError> {
+        // Test that $var is literal in single-quoted strings
+        let tokens = collect_tokens(r#"'Price: $100 for ${item}'"#)?;
+        assert_eq!(tokens, vec![
+            Rule::SingleQuoteString,  // Contains literal "$100 for ${item}"
+            Rule::End
+        ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_single_quote_string_with_escapes() -> Result<(), ParlexError> {
+        // Test escape sequences in single-quoted strings
+        let tokens = collect_tokens(r#"'can\'t and \\ backslash'"#)?;
+        assert_eq!(tokens, vec![
+            Rule::SingleQuoteString,  // Contains "can\'t and \\ backslash"
+            Rule::End
+        ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_single_vs_double_quotes() -> Result<(), ParlexError> {
+        // Test difference between single and double quotes
+        let tokens = collect_tokens(r#"'$name' "$name""#)?;
+        assert_eq!(tokens, vec![
+            Rule::SingleQuoteString,  // '$name' - literal
+            Rule::Whitespace,
+            Rule::StringStart,
+            Rule::Dollar,             // "$name" - interpolated
+            Rule::Identifier,
+            Rule::StringEnd,
+            Rule::End
+        ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_prompt_interpolation_identifier() -> Result<(), ParlexError> {
+        // Test $identifier in prompt context
+        let input = r#"think { Analyze $filename }"#;
+        let tokens = collect_tokens(input)?;
+
+        assert_eq!(tokens, vec![
+            Rule::Think,
+            Rule::Whitespace,
+            Rule::LBrace,
+            Rule::Whitespace,
+            Rule::PromptText,      // "Analyze"
+            Rule::Whitespace,
+            Rule::Dollar,
+            Rule::Identifier,      // filename
+            Rule::Whitespace,
+            Rule::RBrace,
+            Rule::End
+        ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_prompt_interpolation_expression() -> Result<(), ParlexError> {
+        // Test ${expression} in prompt context
+        let input = r#"think { Check ${x + y} items }"#;
+        let tokens = collect_tokens(input)?;
+
+        assert_eq!(tokens, vec![
+            Rule::Think,
+            Rule::Whitespace,
+            Rule::LBrace,
+            Rule::Whitespace,
+            Rule::PromptText,      // "Check"
+            Rule::Whitespace,
+            Rule::Dollar,
+            Rule::LBrace,
+            Rule::Identifier,      // x
+            Rule::Whitespace,
+            Rule::Plus,
+            Rule::Whitespace,
+            Rule::Identifier,      // y
+            Rule::RBrace,
+            Rule::Whitespace,
+            Rule::PromptText,      // "items"
+            Rule::Whitespace,
+            Rule::RBrace,
+            Rule::End
+        ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_prompt_interpolation_command() -> Result<(), ParlexError> {
+        // Test $(command) in prompt context
+        let input = r#"ask { What is $(date) today? }"#;
+        let tokens = collect_tokens(input)?;
+
+        assert_eq!(tokens, vec![
+            Rule::Ask,
+            Rule::Whitespace,
+            Rule::LBrace,
+            Rule::Whitespace,
+            Rule::PromptText,      // "What"
+            Rule::Whitespace,
+            Rule::PromptText,      // "is"
+            Rule::Whitespace,
+            Rule::Dollar,
+            Rule::LParen,
+            Rule::Identifier,      // date
+            Rule::RParen,
+            Rule::Whitespace,
+            Rule::PromptText,      // "today?"
+            Rule::Whitespace,
+            Rule::RBrace,
+            Rule::End
+        ]);
+        Ok(())
+    }
+
+    #[test]
+    fn test_prompt_interpolation_mixed() -> Result<(), ParlexError> {
+        // Test multiple interpolation forms in one prompt
+        let input = r#"think { Process $file with ${count} items from $(source) }"#;
+        let tokens = collect_tokens(input)?;
+
+        // Verify it contains all the expected token types
+        assert!(tokens.contains(&Rule::Think));
+        assert!(tokens.contains(&Rule::PromptText));
+        assert!(tokens.contains(&Rule::Dollar));
+        assert!(tokens.contains(&Rule::Identifier));
+        assert!(tokens.contains(&Rule::LBrace));
+        assert!(tokens.contains(&Rule::RBrace));
+        assert!(tokens.contains(&Rule::LParen));
+        assert!(tokens.contains(&Rule::RParen));
+        assert!(tokens.contains(&Rule::Plus) == false);  // count not used in expression here
+        assert!(tokens.contains(&Rule::End));
         Ok(())
     }
 }
