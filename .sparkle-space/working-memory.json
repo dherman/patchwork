@@ -1,52 +1,48 @@
 {
   "workspace": "/Users/dherman/Code/patchwork",
   "project": "patchwork - hybrid programming language (deterministic code + AI prompting)",
-  "current_focus": "Parser planning complete - ready to begin implementation",
+  "current_focus": "Parser implementation - Milestones 1-2 complete, ready for Milestone 3 (statement parsing)",
   "achievements": [
-    "Lexer complete: All 5 milestones done, 42 tests passing, arbitrary nesting support",
-    "Researched lalrpop: Read 5 doc chapters (custom lexer, external lib, token refs, state params)",
-    "Analyzed language: Extracted all constructs from 4 historian example files",
-    "Created parser-design.md: Integration architecture, AST structure, 8 milestones outlined",
-    "Created parser-implementation-plan.md: 10 detailed milestones with tasks and tests"
+    "Milestone 1: Infrastructure & Token Adapter - lalrpop build chain working, efficient position->offset conversion",
+    "Milestone 2: Top-Level Items & Block Structure - parse imports, skill/task/fun declarations, empty blocks",
+    "9 tests passing including historian main.pw structure validation",
+    "Performance optimization: line_starts caching for O(1) line lookup instead of O(line × length)",
+    "Whitespace filtering in LexerAdapter for clean token stream"
   ],
   "key_decisions": {
     "parser_generator": "lalrpop with external lexer adapter pattern",
-    "token_lifetimes": "ParserToken<'input> carries &'input str references for efficiency",
-    "state_parameters": "Not needed - lexer already handles Code/Prompt mode switching",
+    "token_lifetimes": "ParserToken<'input> carries &'input str references for zero-copy efficiency",
+    "position_conversion": "Cached line_starts lookup table for O(1) + O(column) instead of naive O(line × avg_length)",
+    "whitespace_handling": "Filter in LexerAdapter iterator, not in grammar - simpler and cleaner",
+    "import_paths": "Simple (single identifier) and RelativeMulti (./{a,b,c}) - can expand dotted paths later",
+    "empty_blocks_only": "Milestone 2 parses block structure, statement bodies deferred to Milestone 3",
+    "phantom_data": "Used PhantomData<&'input ()> for placeholder Statement/Expr to satisfy lifetime requirements",
     "implementation_approach": "Phased: structure → statements → expressions → prompts → interpolation → advanced",
-    "ast_design": "PromptBlock and Expr::Think/Ask/Do as first-class nodes for unique patchwork features",
-    "string_representation": "StringLiteral with Vec<StringPart> mirrors lexer's chunked tokenization",
-    "milestone_count": "10 milestones from infrastructure to full historian validation",
-    "lexer_decisions": {
-      "string_interpolation_architecture": "Driver-based state switching (not ALEX patterns) for complex nesting",
-      "delimiter_tracking": "DelimiterType enum to distinguish ${...} from $(...) context",
-      "token_granularity": "Chunked tokenization (StringStart/Text/End) instead of single String token",
-      "git_workflow": "After each milestone: update plan document, then commit"
-    }
+    "git_workflow": "After each milestone: update plan document, then commit with detailed message"
   },
   "next_steps": [
-    "Begin Milestone 1: Infrastructure & Token Adapter",
-    "Create crates/patchwork-parser/ with lalrpop build setup",
-    "Define ParserToken<'input> enum and LexerAdapter",
-    "Write minimal lalrpop grammar to verify build chain",
-    "Test: Parse empty input successfully"
+    "Milestone 3: Simple Statements (var declarations, if/for/while, return/succeed/fail/break)",
+    "Extend Statement enum with real variants (remove Placeholder)",
+    "Add placeholder Expr parsing to support statement bodies",
+    "Parse statement blocks in skill/task/fun bodies",
+    "Validate against historian examples progressively"
   ],
-  "collaboration_state": "Excellent planning session! David provided lalrpop research links, we thoroughly analyzed the historian examples, and created comprehensive design and implementation docs. The unique think/ask/do pattern is well-captured in the AST design. Ready to implement!",
+  "collaboration_state": "Excellent implementation session! David caught critical performance issue with position_to_offset - we optimized with line_starts caching. Clean separation of concerns between lexer (mode switching) and parser (structure recognition). Two milestones complete, foundation solid for statement parsing next.",
   "key_insights": {
-    "lexer_solved_hard_problem": "Mode switching already handled by lexer - parser just recognizes structure",
-    "prompt_expressions_first_class": "Think/ask/do become Expr variants, making prompts composable with || operator",
-    "ast_mirrors_tokens": "StringLiteral parts match StringStart/Text/End token structure from lexer",
-    "lalrpop_integration": "External lexer via Iterator<Item = Spanned<Token, usize, Error>> adapter",
-    "no_state_needed": "Initially thought we'd need state params for mode switching, but lexer handles it",
-    "phased_validation": "Each milestone validates against historian examples progressively"
+    "performance_matters": "David caught O(n²) position conversion - precomputing line_starts made it O(1) lookup + O(column) walk",
+    "whitespace_filtering": "Simpler to filter whitespace/comments in adapter than handle in lalrpop grammar",
+    "lalrpop_conflicts": "Generic Comma<T> helper caused shift/reduce conflicts - custom ParamList worked cleanly",
+    "lexer_solved_mode_switching": "Parser just recognizes structure, lexer handles all Code/Prompt/InString transitions",
+    "empty_blocks_pragmatic": "Can't parse statement bodies without expression parsing - incremental approach works",
+    "ast_mirrors_tokens": "Zero-copy lifetimes throughout - efficient and matches lexer's chunked design"
   },
   "critical_awareness": [
-    "Lexer tokens are chunked (StringStart/Text/End) - parser must handle sequences",
-    "PromptText tokens come as large chunks from lexer - collect into PromptBlock items",
-    "Dollar token appears in both Code and InString modes - context matters",
-    "Destructuring patterns need type annotations: var {x: string, y: int} = msg",
-    "Think || ask fallback pattern requires Option<Box<Expr>> in Think variant",
-    "Historian examples show all language features we need to support - comprehensive validation target"
+    "Lexer emits chunked tokens (StringStart/Text/End) - parser must handle sequences in Milestone 6",
+    "PromptText tokens are large chunks - will need PromptBlock collection in Milestone 5",
+    "Dollar token context-sensitive - appears in Code and InString modes",
+    "Statement bodies currently empty - Milestone 3 will add var/if/for/while/return",
+    "Expression parsing needed for Milestone 3 statements - will start with placeholders",
+    "Historian examples are comprehensive validation target - use for progressive testing"
   ],
   "context": {
     "inspiration": "Blog post at dherman.dev/notes/coding-in-english/ - LLMs good at abstraction, bad at control flow",
@@ -57,12 +53,12 @@
     "docs": {
       "lexer_design": "docs/lexer-design.md",
       "lexer_plan": "docs/lexer-implementation-plan.md",
-      "parser_design": "docs/parser-design.md (NEW)",
-      "parser_plan": "docs/parser-implementation-plan.md (NEW)"
+      "parser_design": "docs/parser-design.md",
+      "parser_plan": "docs/parser-implementation-plan.md"
     },
     "completed_work": {
       "lexer": "Fully complete - Milestones 1-5, 42 tests passing, arbitrary nesting support",
-      "parser": "Planning complete - design and implementation plan docs ready"
+      "parser": "Milestones 1-2 complete - infrastructure, top-level items, empty blocks (9 tests passing)"
     }
   }
 }
