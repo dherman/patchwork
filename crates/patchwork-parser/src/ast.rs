@@ -11,13 +11,14 @@ pub struct Program<'input> {
     pub items: Vec<Item<'input>>,
 }
 
-/// Top-level item (import, skill, task, or function declaration)
+/// Top-level item (import, skill, task, function, or type declaration)
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item<'input> {
     Import(ImportDecl<'input>),
     Skill(SkillDecl<'input>),
     Task(TaskDecl<'input>),
     Function(FunctionDecl<'input>),
+    Type(TypeDeclItem<'input>),
 }
 
 /// Import declaration: `import std.log` or `import ./{analyst, narrator}`
@@ -57,6 +58,13 @@ pub struct FunctionDecl<'input> {
     pub name: &'input str,
     pub params: Vec<Param<'input>>,
     pub body: Block<'input>,
+}
+
+/// Type declaration: `type name = TypeExpr`
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeDeclItem<'input> {
+    pub name: &'input str,
+    pub type_expr: TypeExpr<'input>,
 }
 
 /// Function/task/skill parameter
@@ -132,11 +140,28 @@ pub enum Statement<'input> {
     Break,
 }
 
-/// Type expression (Milestone 3: minimal placeholder, full implementation in Milestone 8)
+/// Type expression (Milestone 8: complete type system)
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeExpr<'input> {
     /// Simple type name: `string`, `int`, etc.
     Name(&'input str),
+    /// Object type: `{ x: string, y: int }`
+    Object(Vec<TypeField<'input>>),
+    /// Array type: `[string]`
+    Array(Box<TypeExpr<'input>>),
+    /// Union type: `"success" | "error"` or `string | int`
+    Union(Vec<TypeExpr<'input>>),
+    /// String literal type: `"success"`
+    Literal(&'input str),
+}
+
+/// Field in an object type
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeField<'input> {
+    pub key: &'input str,
+    pub type_expr: TypeExpr<'input>,
+    /// For future optional field syntax `key?: type`
+    pub optional: bool,
 }
 
 /// Binary operator

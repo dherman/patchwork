@@ -332,6 +332,7 @@ mod tests {
                         assert!(type_ann.is_some());
                         match type_ann.as_ref().unwrap() {
                             TypeExpr::Name(t) => assert_eq!(*t, "string"),
+                            _ => panic!("Expected Name type"),
                         }
                     }
                     _ => panic!("Expected identifier pattern"),
@@ -1970,6 +1971,481 @@ mod tests {
                 }
             }
             _ => panic!("Expected var decl"),
+        }
+    }
+
+    // ===== Milestone 8: Type System Tests =====
+
+    #[test]
+    fn test_simple_type_annotation() {
+        // Test simple type annotation in variable declaration
+        let input = r#"
+            fun test() {
+                var x: string
+            }
+        "#;
+        let program = parse(input).expect("Should parse simple type annotation");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, .. } => {
+                match pattern {
+                    Pattern::Identifier { name, type_ann } => {
+                        assert_eq!(*name, "x");
+                        assert!(type_ann.is_some());
+                        match type_ann.as_ref().unwrap() {
+                            TypeExpr::Name(n) => assert_eq!(*n, "string"),
+                            _ => panic!("Expected Name type"),
+                        }
+                    }
+                    _ => panic!("Expected identifier pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_array_type() {
+        // Test array type: var items: [string]
+        let input = r#"
+            fun test() {
+                var items: [string]
+            }
+        "#;
+        let program = parse(input).expect("Should parse array type");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, .. } => {
+                match pattern {
+                    Pattern::Identifier { name, type_ann } => {
+                        assert_eq!(*name, "items");
+                        match type_ann.as_ref().unwrap() {
+                            TypeExpr::Array(elem_type) => {
+                                match elem_type.as_ref() {
+                                    TypeExpr::Name(n) => assert_eq!(*n, "string"),
+                                    _ => panic!("Expected Name type for array element"),
+                                }
+                            }
+                            _ => panic!("Expected Array type"),
+                        }
+                    }
+                    _ => panic!("Expected identifier pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_union_type() {
+        // Test union type: status: "success" | "error"
+        let input = r#"
+            fun test() {
+                var status: "success" | "error"
+            }
+        "#;
+        let program = parse(input).expect("Should parse union type");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, .. } => {
+                match pattern {
+                    Pattern::Identifier { name, type_ann } => {
+                        assert_eq!(*name, "status");
+                        match type_ann.as_ref().unwrap() {
+                            TypeExpr::Union(types) => {
+                                assert_eq!(types.len(), 2);
+                                match &types[0] {
+                                    TypeExpr::Literal(s) => assert_eq!(*s, "success"),
+                                    _ => panic!("Expected Literal type"),
+                                }
+                                match &types[1] {
+                                    TypeExpr::Literal(s) => assert_eq!(*s, "error"),
+                                    _ => panic!("Expected Literal type"),
+                                }
+                            }
+                            _ => panic!("Expected Union type"),
+                        }
+                    }
+                    _ => panic!("Expected identifier pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_object_type() {
+        // Test object type: var msg: {x: string, y: int}
+        let input = r#"
+            fun test() {
+                var msg: {x: string, y: int}
+            }
+        "#;
+        let program = parse(input).expect("Should parse object type");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, .. } => {
+                match pattern {
+                    Pattern::Identifier { name, type_ann } => {
+                        assert_eq!(*name, "msg");
+                        match type_ann.as_ref().unwrap() {
+                            TypeExpr::Object(fields) => {
+                                assert_eq!(fields.len(), 2);
+                                assert_eq!(fields[0].key, "x");
+                                match &fields[0].type_expr {
+                                    TypeExpr::Name(n) => assert_eq!(*n, "string"),
+                                    _ => panic!("Expected Name type"),
+                                }
+                                assert_eq!(fields[1].key, "y");
+                                match &fields[1].type_expr {
+                                    TypeExpr::Name(n) => assert_eq!(*n, "int"),
+                                    _ => panic!("Expected Name type"),
+                                }
+                            }
+                            _ => panic!("Expected Object type"),
+                        }
+                    }
+                    _ => panic!("Expected identifier pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_destructuring_with_type_annotations() {
+        // Test destructuring with type annotations: var {x: string, y: int} = msg
+        let input = r#"
+            fun test() {
+                var {x: string, y: int} = msg
+            }
+        "#;
+        let program = parse(input).expect("Should parse destructuring with types");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, .. } => {
+                match pattern {
+                    Pattern::Object(fields) => {
+                        assert_eq!(fields.len(), 2);
+                        // First field: x: string
+                        assert_eq!(fields[0].key, "x");
+                        assert!(fields[0].type_ann.is_some());
+                        match fields[0].type_ann.as_ref().unwrap() {
+                            TypeExpr::Name(n) => assert_eq!(*n, "string"),
+                            _ => panic!("Expected Name type"),
+                        }
+                        // Second field: y: int
+                        assert_eq!(fields[1].key, "y");
+                        match fields[1].type_ann.as_ref().unwrap() {
+                            TypeExpr::Name(n) => assert_eq!(*n, "int"),
+                            _ => panic!("Expected Name type"),
+                        }
+                    }
+                    _ => panic!("Expected object pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_type_declaration_simple() {
+        // Test simple type declaration: type username = string
+        let input = "type username = string";
+        let program = parse(input).expect("Should parse simple type declaration");
+
+        match &program.items[0] {
+            Item::Type(type_decl) => {
+                assert_eq!(type_decl.name, "username");
+                match &type_decl.type_expr {
+                    TypeExpr::Name(n) => assert_eq!(*n, "string"),
+                    _ => panic!("Expected Name type"),
+                }
+            }
+            _ => panic!("Expected type declaration"),
+        }
+    }
+
+    #[test]
+    fn test_type_declaration_union() {
+        // Test type declaration with union: type status = "success" | "error"
+        let input = r#"type status = "success" | "error""#;
+        let program = parse(input).expect("Should parse union type declaration");
+
+        match &program.items[0] {
+            Item::Type(type_decl) => {
+                assert_eq!(type_decl.name, "status");
+                match &type_decl.type_expr {
+                    TypeExpr::Union(types) => {
+                        assert_eq!(types.len(), 2);
+                        match &types[0] {
+                            TypeExpr::Literal(s) => assert_eq!(*s, "success"),
+                            _ => panic!("Expected Literal type"),
+                        }
+                        match &types[1] {
+                            TypeExpr::Literal(s) => assert_eq!(*s, "error"),
+                            _ => panic!("Expected Literal type"),
+                        }
+                    }
+                    _ => panic!("Expected Union type"),
+                }
+            }
+            _ => panic!("Expected type declaration"),
+        }
+    }
+
+    #[test]
+    fn test_type_declaration_object() {
+        // Test type declaration with object type
+        let input = r#"
+            type scribe_result = {
+                status: "success" | "error",
+                commit_hash: string
+            }
+        "#;
+        let program = parse(input).expect("Should parse object type declaration");
+
+        match &program.items[0] {
+            Item::Type(type_decl) => {
+                assert_eq!(type_decl.name, "scribe_result");
+                match &type_decl.type_expr {
+                    TypeExpr::Object(fields) => {
+                        assert_eq!(fields.len(), 2);
+                        // First field: status: "success" | "error"
+                        assert_eq!(fields[0].key, "status");
+                        match &fields[0].type_expr {
+                            TypeExpr::Union(types) => {
+                                assert_eq!(types.len(), 2);
+                            }
+                            _ => panic!("Expected Union type"),
+                        }
+                        // Second field: commit_hash: string
+                        assert_eq!(fields[1].key, "commit_hash");
+                        match &fields[1].type_expr {
+                            TypeExpr::Name(n) => assert_eq!(*n, "string"),
+                            _ => panic!("Expected Name type"),
+                        }
+                    }
+                    _ => panic!("Expected Object type"),
+                }
+            }
+            _ => panic!("Expected type declaration"),
+        }
+    }
+
+    #[test]
+    fn test_nested_array_type() {
+        // Test nested array type: [[string]]
+        let input = r#"
+            fun test() {
+                var matrix: [[string]]
+            }
+        "#;
+        let program = parse(input).expect("Should parse nested array type");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, .. } => {
+                match pattern {
+                    Pattern::Identifier { name, type_ann } => {
+                        assert_eq!(*name, "matrix");
+                        match type_ann.as_ref().unwrap() {
+                            TypeExpr::Array(outer) => {
+                                match outer.as_ref() {
+                                    TypeExpr::Array(inner) => {
+                                        match inner.as_ref() {
+                                            TypeExpr::Name(n) => assert_eq!(*n, "string"),
+                                            _ => panic!("Expected Name type"),
+                                        }
+                                    }
+                                    _ => panic!("Expected inner Array type"),
+                                }
+                            }
+                            _ => panic!("Expected outer Array type"),
+                        }
+                    }
+                    _ => panic!("Expected identifier pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_complex_union_type() {
+        // Test union of multiple types: string | int | "none"
+        let input = r#"
+            fun test() {
+                var value: string | int | "none"
+            }
+        "#;
+        let program = parse(input).expect("Should parse complex union type");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, .. } => {
+                match pattern {
+                    Pattern::Identifier { name, type_ann } => {
+                        assert_eq!(*name, "value");
+                        match type_ann.as_ref().unwrap() {
+                            TypeExpr::Union(types) => {
+                                assert_eq!(types.len(), 3);
+                                match &types[0] {
+                                    TypeExpr::Name(n) => assert_eq!(*n, "string"),
+                                    _ => panic!("Expected Name type"),
+                                }
+                                match &types[1] {
+                                    TypeExpr::Name(n) => assert_eq!(*n, "int"),
+                                    _ => panic!("Expected Name type"),
+                                }
+                                match &types[2] {
+                                    TypeExpr::Literal(s) => assert_eq!(*s, "none"),
+                                    _ => panic!("Expected Literal type"),
+                                }
+                            }
+                            _ => panic!("Expected Union type"),
+                        }
+                    }
+                    _ => panic!("Expected identifier pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_array_of_object_type() {
+        // Test array of object type: [{name: string, value: int}]
+        let input = r#"
+            fun test() {
+                var records: [{name: string, value: int}]
+            }
+        "#;
+        let program = parse(input).expect("Should parse array of object type");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, .. } => {
+                match pattern {
+                    Pattern::Identifier { name, type_ann } => {
+                        assert_eq!(*name, "records");
+                        match type_ann.as_ref().unwrap() {
+                            TypeExpr::Array(elem_type) => {
+                                match elem_type.as_ref() {
+                                    TypeExpr::Object(fields) => {
+                                        assert_eq!(fields.len(), 2);
+                                        assert_eq!(fields[0].key, "name");
+                                        assert_eq!(fields[1].key, "value");
+                                    }
+                                    _ => panic!("Expected Object type"),
+                                }
+                            }
+                            _ => panic!("Expected Array type"),
+                        }
+                    }
+                    _ => panic!("Expected identifier pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_multiple_type_declarations() {
+        // Test multiple type declarations in a program
+        let input = r#"
+            type username = string
+            type status = "active" | "inactive"
+            type user = {name: username, status: status}
+        "#;
+        let program = parse(input).expect("Should parse multiple type declarations");
+
+        assert_eq!(program.items.len(), 3);
+
+        // First: type username = string
+        match &program.items[0] {
+            Item::Type(type_decl) => {
+                assert_eq!(type_decl.name, "username");
+                match &type_decl.type_expr {
+                    TypeExpr::Name(n) => assert_eq!(*n, "string"),
+                    _ => panic!("Expected Name type"),
+                }
+            }
+            _ => panic!("Expected type declaration"),
+        }
+
+        // Second: type status = "active" | "inactive"
+        match &program.items[1] {
+            Item::Type(type_decl) => {
+                assert_eq!(type_decl.name, "status");
+                match &type_decl.type_expr {
+                    TypeExpr::Union(_) => {},
+                    _ => panic!("Expected Union type"),
+                }
+            }
+            _ => panic!("Expected type declaration"),
+        }
+
+        // Third: type user = {name: username, status: status}
+        match &program.items[2] {
+            Item::Type(type_decl) => {
+                assert_eq!(type_decl.name, "user");
+                match &type_decl.type_expr {
+                    TypeExpr::Object(fields) => {
+                        assert_eq!(fields.len(), 2);
+                        assert_eq!(fields[0].key, "name");
+                        assert_eq!(fields[1].key, "status");
+                        // Note: username and status here are Name types (referencing other type declarations)
+                        match &fields[0].type_expr {
+                            TypeExpr::Name(n) => assert_eq!(*n, "username"),
+                            _ => panic!("Expected Name type"),
+                        }
+                        match &fields[1].type_expr {
+                            TypeExpr::Name(n) => assert_eq!(*n, "status"),
+                            _ => panic!("Expected Name type"),
+                        }
+                    }
+                    _ => panic!("Expected Object type"),
+                }
+            }
+            _ => panic!("Expected type declaration"),
         }
     }
 }

@@ -121,6 +121,7 @@ Item: Item<'input> = {
     <SkillDecl> => Item::Skill(<>),
     <TaskDecl> => Item::Task(<>),
     <FunctionDecl> => Item::Function(<>),
+    <TypeDecl> => Item::Type(<>),
 };
 
 // Import declaration: `import path` or `import ./{a, b, c}`
@@ -159,6 +160,13 @@ TaskDecl: TaskDecl<'input> = {
 FunctionDecl: FunctionDecl<'input> = {
     "fun" <name:identifier> "(" <params:ParamList> ")" <body:Block> => {
         FunctionDecl { name, params, body }
+    },
+};
+
+// Type declaration: type name = TypeExpr
+TypeDecl: TypeDeclItem<'input> = {
+    "type" <name:identifier> "=" <type_expr:TypeExpr> => {
+        TypeDeclItem { name, type_expr }
     },
 };
 
@@ -294,9 +302,70 @@ ExprStmt: Statement<'input> = {
     <Expr> => Statement::Expr(<>),
 };
 
-// Type expression (Milestone 3: simple names only)
+// Type expression (Milestone 8: complete type system)
+// Union types have lowest precedence (type1 | type2 | type3)
 TypeExpr: TypeExpr<'input> = {
+    <UnionTypeExpr>,
+};
+
+// Union type: string | int | "literal"
+UnionTypeExpr: TypeExpr<'input> = {
+    <head:PrimaryTypeExpr> <tail:("|" <PrimaryTypeExpr>)+> => {
+        let mut types = vec![head];
+        types.extend(tail);
+        TypeExpr::Union(types)
+    },
+    <PrimaryTypeExpr>,
+};
+
+// Primary type expressions (atoms)
+PrimaryTypeExpr: TypeExpr<'input> = {
+    // Simple type name: string, int, etc.
     <identifier> => TypeExpr::Name(<>),
+
+    // String literal type: "success"
+    <StringLiteral> => {
+        // Extract the literal value from the string literal
+        // For now, we assume it's a simple string (no interpolation)
+        // In a real implementation, we'd validate this
+        if let Some(StringPart::Text(text)) = <>.parts.first() {
+            TypeExpr::Literal(text)
+        } else {
+            // If it's an interpolated string, that's invalid for a literal type
+            // For now, treat as empty literal
+            TypeExpr::Literal("")
+        }
+    },
+
+    // Array type: [ElementType]
+    "[" <elem_type:TypeExpr> "]" => TypeExpr::Array(Box::new(elem_type)),
+
+    // Object type: { x: string, y: int }
+    "{" <fields:TypeFieldList> "}" => TypeExpr::Object(fields),
+};
+
+// Type field list (for object types)
+// Allow newlines for formatting (similar to other lists)
+TypeFieldList: Vec<TypeField<'input>> = {
+    // Empty object type (allow newlines)
+    newline* => vec![],
+    // Single field (with optional surrounding newlines)
+    newline* <head:TypeField> newline* => vec![head],
+    // Multiple fields (with newlines allowed around commas)
+    newline* <head:TypeField> <tail:(newline* "," newline* <TypeField>)+> newline* => {
+        let mut fields = vec![head];
+        fields.extend(tail);
+        fields
+    },
+};
+
+// Type field: key: TypeExpr
+TypeField: TypeField<'input> = {
+    <key:identifier> ":" <type_expr:TypeExpr> => TypeField {
+        key,
+        type_expr,
+        optional: false,  // For now, no optional fields
+    },
 };
 
 // Pattern for variable declarations (Milestone 7)
