@@ -1097,4 +1097,186 @@ mod tests {
             _ => panic!("Expected var decl"),
         }
     }
+
+    // ===== Milestone 5: Prompt Expressions =====
+
+    #[test]
+    fn test_simple_think_block() {
+        let input = r#"
+            task test() {
+                var x = think {
+                    What is the answer?
+                }
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        assert_eq!(program.items.len(), 1);
+
+        // Verify it's a task with a var decl containing a Think expression
+        match &program.items[0] {
+            Item::Task(task) => {
+                assert_eq!(task.body.statements.len(), 1);
+                match &task.body.statements[0] {
+                    Statement::VarDecl { name, init, .. } => {
+                        assert_eq!(*name, "x");
+                        assert!(init.is_some());
+                        match init.as_ref().unwrap() {
+                            Expr::Think(_) => {}, // Success!
+                            _ => panic!("Expected Think expression"),
+                        }
+                    }
+                    _ => panic!("Expected var decl"),
+                }
+            }
+            _ => panic!("Expected task"),
+        }
+    }
+
+    #[test]
+    fn test_simple_ask_block() {
+        let input = r#"
+            task test() {
+                var approval = ask {
+                    Do you approve?
+                }
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        assert_eq!(program.items.len(), 1);
+
+        match &program.items[0] {
+            Item::Task(task) => {
+                assert_eq!(task.body.statements.len(), 1);
+                match &task.body.statements[0] {
+                    Statement::VarDecl { init, .. } => {
+                        match init.as_ref().unwrap() {
+                            Expr::Ask(_) => {}, // Success!
+                            _ => panic!("Expected Ask expression"),
+                        }
+                    }
+                    _ => panic!("Expected var decl"),
+                }
+            }
+            _ => panic!("Expected task"),
+        }
+    }
+
+    #[test]
+    fn test_think_with_fallback() {
+        let input = r#"
+            task test() {
+                var cmd = think {
+                    Figure it out
+                } || ask {
+                    What command?
+                }
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        assert_eq!(program.items.len(), 1);
+
+        // The || creates a Binary expr with Think on left and Ask on right
+        match &program.items[0] {
+            Item::Task(task) => {
+                match &task.body.statements[0] {
+                    Statement::VarDecl { init, .. } => {
+                        match init.as_ref().unwrap() {
+                            Expr::Binary { op: BinOp::Or, left, right } => {
+                                // Left should be Think, right should be Ask
+                                assert!(matches!(**left, Expr::Think(_)));
+                                assert!(matches!(**right, Expr::Ask(_)));
+                            }
+                            _ => panic!("Expected Binary Or expression"),
+                        }
+                    }
+                    _ => panic!("Expected var decl"),
+                }
+            }
+            _ => panic!("Expected task"),
+        }
+    }
+
+    #[test]
+    fn test_prompt_with_embedded_do() {
+        let input = r#"
+            task test() {
+                var result = think {
+                    First analyze the problem.
+                    do {
+                        var x = read_file()
+                    }
+                    Then explain the solution.
+                }
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        assert_eq!(program.items.len(), 1);
+
+        // PromptBlock should have multiple items: text words, then code block, then more text words
+        // Note: lexer splits prompt text into individual words
+        match &program.items[0] {
+            Item::Task(task) => {
+                match &task.body.statements[0] {
+                    Statement::VarDecl { init, .. } => {
+                        match init.as_ref().unwrap() {
+                            Expr::Think(prompt_block) => {
+                                // Should have at least some items
+                                assert!(prompt_block.items.len() > 0);
+
+                                // Find the Code item
+                                let has_code = prompt_block.items.iter()
+                                    .any(|item| matches!(item, PromptItem::Code(_)));
+                                assert!(has_code, "Expected to find a Code item in prompt block");
+
+                                // Should have some text items too
+                                let has_text = prompt_block.items.iter()
+                                    .any(|item| matches!(item, PromptItem::Text(_)));
+                                assert!(has_text, "Expected to find Text items in prompt block");
+                            }
+                            _ => panic!("Expected Think expression"),
+                        }
+                    }
+                    _ => panic!("Expected var decl"),
+                }
+            }
+            _ => panic!("Expected task"),
+        }
+    }
+
+    // Note: do { } is NOT a standalone expression in patchwork
+    // It's only used inside think/ask prompt blocks
+    // So we don't have a test for standalone do expressions
+
+    #[test]
+    fn test_multiline_think_block() {
+        let input = r#"
+            task test() {
+                var build_command = think {
+                    Figure out how to run a lightweight build for this project:
+
+                    **Common patterns:**
+                    - Rust: cargo check
+                    - TypeScript: tsc --noEmit
+
+                    **Check for:**
+                    1. Build files
+                    2. Build scripts
+                }
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        assert_eq!(program.items.len(), 1);
+    }
+
+    #[test]
+    fn test_nested_prompts_in_binary_expr() {
+        // think { } || ask { } is a binary OR expression
+        let input = r#"
+            task foo() {
+                var x = think { analyze } || ask { what should I do? }
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        assert_eq!(program.items.len(), 1);
+    }
 }

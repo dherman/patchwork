@@ -1,26 +1,30 @@
 {
-  "currentFocus": "Patchwork parser implementation - completed Milestone 4 (Basic Expressions), ready for Milestone 5 (Prompt Expressions)",
+  "currentFocus": "Patchwork parser implementation - completed Milestone 5 (Prompt Expressions), ready for Milestone 6 (String Interpolation)",
   "recentAchievements": [
-    "Implemented full expression parsing: literals, binary/unary ops, calls, member access, indexing",
-    "Built manual precedence climbing grammar (10 tiers) avoiding lalrpop conflicts",
-    "Added 14 comprehensive tests covering all expression types including precedence validation",
-    "All 38 tests passing (24 from M1-3 + 14 new M4 tests), zero conflicts"
+    "Implemented prompt expression parsing: think { }, ask { }, and embedded do { } blocks",
+    "Added PromptBlock and PromptItem AST types for patchwork's unique AI-integration features",
+    "Solved lexer/parser mismatch: lexer emits word-level PromptText tokens, parser collects and filters newlines",
+    "Recognized think { } || ask { } uses standard || operator, not special syntax - simplified AST design",
+    "Added 7 comprehensive tests for prompt expressions, all 44 tests passing"
   ],
   "nextSteps": [
-    "Milestone 5: Prompt Expressions (think/ask/do blocks - patchwork's unique features)",
-    "Implement PromptBlock and PromptItem AST types",
-    "Add grammar for prompt expressions with embedded code blocks"
+    "Milestone 6: String Interpolation (${expr}, $(cmd), $id forms)",
+    "Update StringLiteral AST to support interpolation with StringPart enum",
+    "Parse chunked string tokens with embedded expressions"
   ],
-  "collaborativeState": "Excellent momentum - tackled and solved lalrpop precedence challenges together, clean solution emerged",
+  "collaborativeState": "Great momentum and breakthrough moments - especially recognizing || is just regular operator, not special fallback syntax",
   "keyInsights": [
-    "Manual precedence climbing > lalrpop #[precedence] for complex grammars - explicit hierarchy prevents conflicts",
-    "Each precedence tier as separate rule: AssignExpr → PipeExpr → OrExpr → ... → PostfixExpr → PrimaryExpr",
-    "Keywords like 'self' need explicit grammar rules even when they seem like identifiers",
-    "Test-driven development caught the 'self' issue immediately"
+    "think { } || ask { } is binary OR, not special syntax - led to cleaner AST (no fallback field)",
+    "Lexer word-tokenizes prompts: one PromptText per word, not per line - required filtering pattern",
+    "Newline handling in prompts: use Option<PromptItem> to filter None values, avoiding lalrpop ambiguity",
+    "do { } blocks are NOT standalone expressions - only used inside think/ask prompts",
+    "Context-dependent tokens: lexer emits Do only in prompts, 'do' as identifier elsewhere"
   ],
   "criticalAwareness": [
-    "Precedence: Assignment (lowest) → Pipe → OR → AND → Comparison → Range → Add/Sub → Mul/Div → Unary → Postfix (highest)",
-    "Zero-copy lifetime 'input pattern must be maintained throughout",
-    "StringLiteral is currently simple (no interpolation) - Milestone 6 will add ${} support"
+    "Prompt text comes as multiple tokens (word-level), not single chunks",
+    "Grammar pattern: (PromptItemOrNewline)* with filter_map to handle newlines cleanly",
+    "Precedence hierarchy unchanged: Assignment → Pipe → OR → AND → Comparison → Range → Add/Sub → Mul/Div → Unary → Postfix",
+    "Zero-copy lifetime 'input pattern maintained throughout all new types",
+    "StringLiteral still simple (Milestone 4 version) - Milestone 6 adds ${} interpolation"
   ]
 }

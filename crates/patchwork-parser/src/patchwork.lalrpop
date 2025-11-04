@@ -465,6 +465,11 @@ PrimaryExpr: Expr<'input> = {
     "false" => Expr::False,
     "self" => Expr::Identifier("self"),
 
+    // Prompt expressions (think and ask can be used as expressions)
+    <ThinkExpr>,
+    <AskExpr>,
+    // Note: do { } is NOT a standalone expression - only used inside think/ask blocks
+
     // Parenthesized expression
     "(" <e:Expr> ")" => Expr::Paren(Box::new(e)),
 };
@@ -488,4 +493,53 @@ ExprList: Vec<Expr<'input>> = {
         exprs.extend(tail);
         exprs
     },
+};
+
+// ===== Prompt Expressions (Milestone 5) =====
+
+// Think expression: think { ... }
+// Note: think { } || ask { } is just a binary || expression, not special syntax
+ThinkExpr: Expr<'input> = {
+    "think" "{" <content:PromptBlock> "}" => Expr::Think(content),
+};
+
+// Ask expression: ask { ... }
+AskExpr: Expr<'input> = {
+    "ask" "{" <content:PromptBlock> "}" => Expr::Ask(content),
+};
+
+// Do expression: do { ... }
+// Note: Lexer emits Do token only inside prompt blocks
+// Outside prompts, "do" is just an identifier
+// We'll handle both cases by also checking for identifier "do"
+DoExpr: Expr<'input> = {
+    // Inside prompt context - lexer emits Do token
+    "do" "{" <statements:StatementList> "}" => Expr::Do(Block { statements }),
+};
+
+// Prompt block - mixture of text and embedded do blocks
+// Note: Lexer produces multiple prompt_text tokens (one per word) plus newlines
+// We collect them all, and newlines are allowed anywhere
+PromptBlock: PromptBlock<'input> = {
+    <items:(PromptItemOrNewline)*> => {
+        // Filter out None (newlines) and collect the actual items
+        PromptBlock {
+            items: items.into_iter().filter_map(|x| x).collect()
+        }
+    },
+};
+
+// Either a prompt item or a newline (which we'll filter out)
+PromptItemOrNewline: Option<PromptItem<'input>> = {
+    <item:PromptItem> => Some(item),
+    newline => None,
+};
+
+// Individual prompt item - either text or embedded code
+PromptItem: PromptItem<'input> = {
+    // Raw prompt text
+    <text:prompt_text> => PromptItem::Text(text),
+
+    // Embedded do block within a prompt
+    "do" "{" <statements:StatementList> "}" => PromptItem::Code(Block { statements }),
 };

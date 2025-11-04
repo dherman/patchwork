@@ -194,6 +194,27 @@ pub enum Expr<'input> {
     },
     /// Parenthesized expression: `(expr)`
     Paren(Box<Expr<'input>>),
+    /// Think expression: `think { ... }`
+    Think(PromptBlock<'input>),
+    /// Ask expression: `ask { ... }`
+    Ask(PromptBlock<'input>),
+    /// Do expression: `do { ... }`
+    Do(Block<'input>),
     /// Placeholder for unparsed expressions (temporary for incremental implementation)
     Placeholder(PhantomData<&'input ()>),
+}
+
+/// Prompt block content - mixture of text and embedded code
+#[derive(Debug, Clone, PartialEq)]
+pub struct PromptBlock<'input> {
+    pub items: Vec<PromptItem<'input>>,
+}
+
+/// Item within a prompt block
+#[derive(Debug, Clone, PartialEq)]
+pub enum PromptItem<'input> {
+    /// Raw prompt text
+    Text(&'input str),
+    /// Embedded code block: `do { ... }`
+    Code(Block<'input>),
 }
