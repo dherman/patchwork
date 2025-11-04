@@ -227,24 +227,15 @@ Statement: Statement<'input> = {
     <ExprStmt>,
 };
 
-// Variable declaration
-// Reordered to try with = first (greedy matching for init)
+// Variable declaration with pattern support (Milestone 7)
 VarDeclStmt: Statement<'input> = {
-    // var x: type = expr (most specific - try first)
-    "var" <name:identifier> ":" <type_ann:TypeExpr> "=" <init:Expr> => {
-        Statement::VarDecl { name, type_ann: Some(type_ann), init: Some(init) }
+    // var pattern = expr
+    "var" <pattern:Pattern> "=" <init:Expr> => {
+        Statement::VarDecl { pattern, init: Some(init) }
     },
-    // var x = expr (no type annotation)
-    "var" <name:identifier> "=" <init:Expr> => {
-        Statement::VarDecl { name, type_ann: None, init: Some(init) }
-    },
-    // var x: type (no init) - only matches if no = follows
-    "var" <name:identifier> ":" <type_ann:TypeExpr> => {
-        Statement::VarDecl { name, type_ann: Some(type_ann), init: None }
-    },
-    // var x (no init, no type)
-    "var" <name:identifier> => {
-        Statement::VarDecl { name, type_ann: None, init: None }
+    // var pattern (no init)
+    "var" <pattern:Pattern> => {
+        Statement::VarDecl { pattern, init: None }
     },
 };
 
@@ -306,6 +297,45 @@ ExprStmt: Statement<'input> = {
 // Type expression (Milestone 3: simple names only)
 TypeExpr: TypeExpr<'input> = {
     <identifier> => TypeExpr::Name(<>),
+};
+
+// Pattern for variable declarations (Milestone 7)
+Pattern: Pattern<'input> = {
+    // Simple identifier with optional type: var x: type = ...
+    <name:identifier> <type_ann:(":" <TypeExpr>)?> => Pattern::Identifier { name, type_ann },
+
+    // Object destructuring pattern: var {x, y} = ...
+    "{" <fields:ObjectPatternFieldList> "}" => Pattern::Object(fields),
+};
+
+// Object pattern field list
+ObjectPatternFieldList: Vec<ObjectPatternField<'input>> = {
+    // Empty (though not useful, we allow it)
+    => vec![],
+    // Single field
+    <head:ObjectPatternField> => vec![head],
+    // Multiple fields
+    <head:ObjectPatternField> <tail:("," <ObjectPatternField>)+> => {
+        let mut fields = vec![head];
+        fields.extend(tail);
+        fields
+    },
+};
+
+// Object pattern field: key, key: type, or key: nestedPattern
+ObjectPatternField: ObjectPatternField<'input> = {
+    // Simple: {x} means extract x
+    <key:identifier> => ObjectPatternField {
+        key,
+        pattern: Pattern::Identifier { name: key, type_ann: None },
+        type_ann: None,
+    },
+    // With type annotation: {x: string}
+    <key:identifier> ":" <type_ann:TypeExpr> => ObjectPatternField {
+        key,
+        pattern: Pattern::Identifier { name: key, type_ann: None },
+        type_ann: Some(type_ann),
+    },
 };
 
 // Expression with precedence (Milestone 4)
@@ -417,7 +447,7 @@ MulExpr: Expr<'input> = {
     UnaryExpr,
 };
 
-// Unary operators
+// Unary operators and await
 UnaryExpr: Expr<'input> = {
     "!" <operand:UnaryExpr> => Expr::Unary {
         op: UnOp::Not,
@@ -427,6 +457,8 @@ UnaryExpr: Expr<'input> = {
         op: UnOp::Neg,
         operand: Box::new(operand),
     },
+    // Await expression: await task_call()
+    "await" <operand:UnaryExpr> => Expr::Await(Box::new(operand)),
     PostfixExpr,
 };
 
@@ -465,6 +497,12 @@ PrimaryExpr: Expr<'input> = {
     "false" => Expr::False,
     "self" => Expr::Identifier("self"),
 
+    // Array literal: [1, 2, 3]
+    "[" <elements:ExprList> "]" => Expr::Array(elements),
+
+    // Object literal: {x: 1, y: 2} or {x, y}
+    "{" <fields:ObjectFieldList> "}" => Expr::Object(fields),
+
     // Prompt expressions (think and ask can be used as expressions)
     <ThinkExpr>,
     <AskExpr>,
@@ -495,7 +533,7 @@ StringPart: StringPart<'input> = {
     dollar "(" <e:Expr> ")" => StringPart::Interpolation(Box::new(e)),
 };
 
-// Expression list (for function arguments)
+// Expression list (for function arguments and array literals)
 ExprList: Vec<Expr<'input>> = {
     // Empty list
     => vec![],
@@ -507,6 +545,28 @@ ExprList: Vec<Expr<'input>> = {
         exprs.extend(tail);
         exprs
     },
+};
+
+// Object field list (for object literals)
+ObjectFieldList: Vec<ObjectField<'input>> = {
+    // Empty object
+    => vec![],
+    // Single field
+    <head:ObjectField> => vec![head],
+    // Multiple fields
+    <head:ObjectField> <tail:("," <ObjectField>)+> => {
+        let mut fields = vec![head];
+        fields.extend(tail);
+        fields
+    },
+};
+
+// Object field: key: value or key (shorthand)
+ObjectField: ObjectField<'input> = {
+    // Full form: key: value
+    <key:identifier> ":" <value:Expr> => ObjectField { key, value: Some(value) },
+    // Shorthand form: key (means key: key)
+    <key:identifier> => ObjectField { key, value: None },
 };
 
 // ===== Prompt Expressions (Milestone 5) =====

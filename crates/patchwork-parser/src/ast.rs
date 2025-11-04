@@ -72,13 +72,35 @@ pub struct Block<'input> {
     pub statements: Vec<Statement<'input>>,
 }
 
+/// Pattern for destructuring in variable declarations (Milestone 7)
+#[derive(Debug, Clone, PartialEq)]
+pub enum Pattern<'input> {
+    /// Simple identifier pattern: `var x = ...` or `var x: type = ...`
+    Identifier {
+        name: &'input str,
+        type_ann: Option<TypeExpr<'input>>,
+    },
+    /// Object destructuring pattern: `var {x, y} = ...`
+    Object(Vec<ObjectPatternField<'input>>),
+}
+
+/// Field in an object destructuring pattern
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObjectPatternField<'input> {
+    /// Key name in the object being destructured
+    pub key: &'input str,
+    /// Optional nested pattern (for now just identifier, could expand later)
+    pub pattern: Pattern<'input>,
+    /// Optional type annotation for this field
+    pub type_ann: Option<TypeExpr<'input>>,
+}
+
 /// Statement in a block
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement<'input> {
-    /// Variable declaration: `var x` or `var x: type = expr`
+    /// Variable declaration: `var x = expr` or `var {x, y} = expr`
     VarDecl {
-        name: &'input str,
-        type_ann: Option<TypeExpr<'input>>,
+        pattern: Pattern<'input>,
         init: Option<Expr<'input>>,
     },
     /// Expression statement (expression used as statement)
@@ -162,7 +184,7 @@ pub enum StringPart<'input> {
     Interpolation(Box<Expr<'input>>),
 }
 
-/// Expression (Milestone 3: minimal set for statement support, expanded in Milestone 4)
+/// Expression (Milestone 3: minimal set for statement support, expanded in Milestones 4-7)
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr<'input> {
     /// Identifier reference: `foo`
@@ -175,6 +197,10 @@ pub enum Expr<'input> {
     True,
     /// Boolean literal: `false`
     False,
+    /// Array literal: `[1, 2, 3]`
+    Array(Vec<Expr<'input>>),
+    /// Object literal: `{x: 1, y: 2}` or `{x, y}` (shorthand)
+    Object(Vec<ObjectField<'input>>),
     /// Binary operation: `a + b`, `x == y`
     Binary {
         op: BinOp,
@@ -203,6 +229,8 @@ pub enum Expr<'input> {
     },
     /// Parenthesized expression: `(expr)`
     Paren(Box<Expr<'input>>),
+    /// Await expression: `await task_call()`
+    Await(Box<Expr<'input>>),
     /// Think expression: `think { ... }`
     Think(PromptBlock<'input>),
     /// Ask expression: `ask { ... }`
@@ -211,6 +239,14 @@ pub enum Expr<'input> {
     Do(Block<'input>),
     /// Placeholder for unparsed expressions (temporary for incremental implementation)
     Placeholder(PhantomData<&'input ()>),
+}
+
+/// Object field in an object literal
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObjectField<'input> {
+    pub key: &'input str,
+    /// Value expression - None for shorthand syntax `{x}` meaning `{x: x}`
+    pub value: Option<Expr<'input>>,
 }
 
 /// Prompt block content - mixture of text and embedded code

@@ -257,9 +257,14 @@ mod tests {
 
         assert_eq!(func.body.statements.len(), 1);
         match &func.body.statements[0] {
-            Statement::VarDecl { name, type_ann, init } => {
-                assert_eq!(*name, "x");
-                assert!(type_ann.is_none());
+            Statement::VarDecl { pattern, init } => {
+                match pattern {
+                    Pattern::Identifier { name, type_ann } => {
+                        assert_eq!(*name, "x");
+                        assert!(type_ann.is_none());
+                    }
+                    _ => panic!("Expected identifier pattern"),
+                }
                 assert!(init.is_none());
             }
             _ => panic!("Expected VarDecl"),
@@ -284,9 +289,14 @@ mod tests {
 
         assert_eq!(func.body.statements.len(), 1);
         match &func.body.statements[0] {
-            Statement::VarDecl { name, type_ann, init } => {
-                assert_eq!(*name, "x");
-                assert!(type_ann.is_none());
+            Statement::VarDecl { pattern, init } => {
+                match pattern {
+                    Pattern::Identifier { name, type_ann } => {
+                        assert_eq!(*name, "x");
+                        assert!(type_ann.is_none());
+                    }
+                    _ => panic!("Expected identifier pattern"),
+                }
                 assert!(init.is_some());
                 match init.as_ref().unwrap() {
                     Expr::Identifier(id) => assert_eq!(*id, "foo"),
@@ -315,11 +325,16 @@ mod tests {
 
         assert_eq!(func.body.statements.len(), 1);
         match &func.body.statements[0] {
-            Statement::VarDecl { name, type_ann, init } => {
-                assert_eq!(*name, "x");
-                assert!(type_ann.is_some());
-                match type_ann.as_ref().unwrap() {
-                    TypeExpr::Name(t) => assert_eq!(*t, "string"),
+            Statement::VarDecl { pattern, init } => {
+                match pattern {
+                    Pattern::Identifier { name, type_ann } => {
+                        assert_eq!(*name, "x");
+                        assert!(type_ann.is_some());
+                        match type_ann.as_ref().unwrap() {
+                            TypeExpr::Name(t) => assert_eq!(*t, "string"),
+                        }
+                    }
+                    _ => panic!("Expected identifier pattern"),
                 }
                 assert!(init.is_none());
             }
@@ -345,9 +360,14 @@ mod tests {
 
         assert_eq!(func.body.statements.len(), 1);
         match &func.body.statements[0] {
-            Statement::VarDecl { name, type_ann, init } => {
-                assert_eq!(*name, "x");
-                assert!(type_ann.is_some());
+            Statement::VarDecl { pattern, init } => {
+                match pattern {
+                    Pattern::Identifier { name, type_ann } => {
+                        assert_eq!(*name, "x");
+                        assert!(type_ann.is_some());
+                    }
+                    _ => panic!("Expected identifier pattern"),
+                }
                 assert!(init.is_some());
             }
             _ => panic!("Expected VarDecl"),
@@ -711,8 +731,11 @@ mod tests {
         };
 
         match &func.body.statements[0] {
-            Statement::VarDecl { name, init, .. } => {
-                assert_eq!(*name, "x");
+            Statement::VarDecl { pattern, init } => {
+                match pattern {
+                    Pattern::Identifier { name, .. } => assert_eq!(*name, "x"),
+                    _ => panic!("Expected identifier pattern"),
+                }
                 match init.as_ref().unwrap() {
                     Expr::String(s) => {
                         assert_eq!(s.parts.len(), 1);
@@ -1123,8 +1146,11 @@ mod tests {
             Item::Task(task) => {
                 assert_eq!(task.body.statements.len(), 1);
                 match &task.body.statements[0] {
-                    Statement::VarDecl { name, init, .. } => {
-                        assert_eq!(*name, "x");
+                    Statement::VarDecl { pattern, init } => {
+                        match pattern {
+                            Pattern::Identifier { name, .. } => assert_eq!(*name, "x"),
+                            _ => panic!("Expected identifier pattern"),
+                        }
                         assert!(init.is_some());
                         match init.as_ref().unwrap() {
                             Expr::Think(_) => {}, // Success!
@@ -1554,5 +1580,396 @@ mod tests {
         "#;
         let program = parse(input).expect("Should parse");
         assert_eq!(program.items.len(), 1);
+    }
+
+    // ==================== Milestone 7: Advanced Expressions ====================
+
+    #[test]
+    fn test_array_literal_empty() {
+        let input = r#"
+            fun test() {
+                var arr = []
+            }
+        "#;
+        let program = parse(input).expect("Should parse empty array");
+        assert_eq!(program.items.len(), 1);
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, init } => {
+                match pattern {
+                    Pattern::Identifier { name, .. } => assert_eq!(*name, "arr"),
+                    _ => panic!("Expected identifier pattern"),
+                }
+                match init.as_ref().unwrap() {
+                    Expr::Array(elements) => assert_eq!(elements.len(), 0),
+                    _ => panic!("Expected array literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_array_literal_with_elements() {
+        let input = r#"
+            fun test() {
+                var arr = [1, 2, 3]
+            }
+        "#;
+        let program = parse(input).expect("Should parse array with elements");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern: _, init } => {
+                match init.as_ref().unwrap() {
+                    Expr::Array(elements) => {
+                        assert_eq!(elements.len(), 3);
+                        match &elements[0] {
+                            Expr::Number(n) => assert_eq!(*n, "1"),
+                            _ => panic!("Expected number"),
+                        }
+                    }
+                    _ => panic!("Expected array literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_array_with_objects() {
+        let input = r#"
+            fun test() {
+                var arr = [{num: 1}, {num: 2}]
+            }
+        "#;
+        let program = parse(input).expect("Should parse array with objects");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern: _, init } => {
+                match init.as_ref().unwrap() {
+                    Expr::Array(elements) => {
+                        assert_eq!(elements.len(), 2);
+                        match &elements[0] {
+                            Expr::Object(fields) => {
+                                assert_eq!(fields.len(), 1);
+                                assert_eq!(fields[0].key, "num");
+                            }
+                            _ => panic!("Expected object"),
+                        }
+                    }
+                    _ => panic!("Expected array literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_object_literal_empty() {
+        let input = r#"
+            fun test() {
+                var obj = {}
+            }
+        "#;
+        let program = parse(input).expect("Should parse empty object");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern: _, init } => {
+                match init.as_ref().unwrap() {
+                    Expr::Object(fields) => assert_eq!(fields.len(), 0),
+                    _ => panic!("Expected object literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_object_literal_with_fields() {
+        let input = r#"
+            fun test() {
+                var obj = {x: 1, y: 2}
+            }
+        "#;
+        let program = parse(input).expect("Should parse object with fields");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern: _, init } => {
+                match init.as_ref().unwrap() {
+                    Expr::Object(fields) => {
+                        assert_eq!(fields.len(), 2);
+                        assert_eq!(fields[0].key, "x");
+                        assert!(fields[0].value.is_some());
+                        assert_eq!(fields[1].key, "y");
+                        assert!(fields[1].value.is_some());
+                    }
+                    _ => panic!("Expected object literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_object_literal_shorthand() {
+        let input = r#"
+            fun test() {
+                var obj = {session_id, timestamp}
+            }
+        "#;
+        let program = parse(input).expect("Should parse object with shorthand");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern: _, init } => {
+                match init.as_ref().unwrap() {
+                    Expr::Object(fields) => {
+                        assert_eq!(fields.len(), 2);
+                        assert_eq!(fields[0].key, "session_id");
+                        assert!(fields[0].value.is_none(), "Shorthand should have no value");
+                        assert_eq!(fields[1].key, "timestamp");
+                        assert!(fields[1].value.is_none(), "Shorthand should have no value");
+                    }
+                    _ => panic!("Expected object literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_object_literal_mixed() {
+        let input = r#"
+            fun test() {
+                var obj = {x: 1, y}
+            }
+        "#;
+        let program = parse(input).expect("Should parse object with mixed syntax");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern: _, init } => {
+                match init.as_ref().unwrap() {
+                    Expr::Object(fields) => {
+                        assert_eq!(fields.len(), 2);
+                        assert_eq!(fields[0].key, "x");
+                        assert!(fields[0].value.is_some());
+                        assert_eq!(fields[1].key, "y");
+                        assert!(fields[1].value.is_none());
+                    }
+                    _ => panic!("Expected object literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_destructuring_simple() {
+        let input = r#"
+            fun test() {
+                var {x, y} = obj
+            }
+        "#;
+        let program = parse(input).expect("Should parse simple destructuring");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, init: _ } => {
+                match pattern {
+                    Pattern::Object(fields) => {
+                        assert_eq!(fields.len(), 2);
+                        assert_eq!(fields[0].key, "x");
+                        assert!(fields[0].type_ann.is_none());
+                        assert_eq!(fields[1].key, "y");
+                        assert!(fields[1].type_ann.is_none());
+                    }
+                    _ => panic!("Expected object pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_destructuring_with_types() {
+        let input = r#"
+            fun test() {
+                var {x: string, y: int} = obj
+            }
+        "#;
+        let program = parse(input).expect("Should parse destructuring with types");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, init: _ } => {
+                match pattern {
+                    Pattern::Object(fields) => {
+                        assert_eq!(fields.len(), 2);
+                        assert_eq!(fields[0].key, "x");
+                        assert!(fields[0].type_ann.is_some());
+                        assert_eq!(fields[1].key, "y");
+                        assert!(fields[1].type_ann.is_some());
+                    }
+                    _ => panic!("Expected object pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_await_simple() {
+        let input = r#"
+            skill test() {
+                await foo()
+            }
+        "#;
+        let program = parse(input).expect("Should parse await");
+
+        let skill = match &program.items[0] {
+            Item::Skill(s) => s,
+            _ => panic!("Expected skill"),
+        };
+
+        match &skill.body.statements[0] {
+            Statement::Expr(expr) => {
+                match expr {
+                    Expr::Await(inner) => {
+                        match inner.as_ref() {
+                            Expr::Call { callee, args } => {
+                                match callee.as_ref() {
+                                    Expr::Identifier(id) => {
+                                        assert_eq!(*id, "foo");
+                                        assert_eq!(args.len(), 0);
+                                    }
+                                    _ => panic!("Expected identifier"),
+                                }
+                            }
+                            _ => panic!("Expected call"),
+                        }
+                    }
+                    _ => panic!("Expected await"),
+                }
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_await_multiple_calls() {
+        // Test awaiting a call with multiple function calls as arguments
+        let input = r#"
+            skill test() {
+                await coordinator(a(), b(), c())
+            }
+        "#;
+        let program = parse(input).expect("Should parse await with multiple calls");
+
+        let skill = match &program.items[0] {
+            Item::Skill(s) => s,
+            _ => panic!("Expected skill"),
+        };
+
+        match &skill.body.statements[0] {
+            Statement::Expr(expr) => {
+                match expr {
+                    Expr::Await(inner) => {
+                        match inner.as_ref() {
+                            Expr::Call { callee, args } => {
+                                match callee.as_ref() {
+                                    Expr::Identifier(id) => assert_eq!(*id, "coordinator"),
+                                    _ => panic!("Expected identifier"),
+                                }
+                                assert_eq!(args.len(), 3);
+                            }
+                            _ => panic!("Expected call"),
+                        }
+                    }
+                    _ => panic!("Expected await"),
+                }
+            }
+            _ => panic!("Expected expression statement"),
+        }
+    }
+
+    #[test]
+    fn test_complex_historian_expression() {
+        // Test a complex expression from historian examples
+        // Note: Object literals on one line to avoid newline parsing issues
+        let input = r#"
+            fun test() {
+                var plan = {commits: [{num: 1, description: "first"}], session_id}
+            }
+        "#;
+        let program = parse(input).expect("Should parse complex nested structure");
+
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, init } => {
+                match pattern {
+                    Pattern::Identifier { name, .. } => assert_eq!(*name, "plan"),
+                    _ => panic!("Expected identifier pattern"),
+                }
+                match init.as_ref().unwrap() {
+                    Expr::Object(fields) => {
+                        assert_eq!(fields.len(), 2);
+                        // First field: commits: [...]
+                        assert_eq!(fields[0].key, "commits");
+                        assert!(fields[0].value.is_some());
+                        // Second field: session_id (shorthand)
+                        assert_eq!(fields[1].key, "session_id");
+                        assert!(fields[1].value.is_none());
+                    }
+                    _ => panic!("Expected object"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
     }
 }
