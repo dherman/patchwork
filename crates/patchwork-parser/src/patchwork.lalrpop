@@ -1,0 +1,107 @@
+// Minimal patchwork grammar to verify lalrpop build chain
+// This is Milestone 1 - just infrastructure, no real parsing yet
+
+use crate::token::ParserToken;
+use crate::adapter::ParseError;
+
+grammar<'input>(input: &'input str);
+
+// External token definition - we use our custom lexer
+extern {
+    type Location = usize;
+    type Error = ParseError;
+
+    enum ParserToken<'input> {
+        // Whitespace
+        whitespace => ParserToken::Whitespace(<&'input str>),
+        newline => ParserToken::Newline(<&'input str>),
+
+        // String literals
+        string_start => ParserToken::StringStart,
+        string_end => ParserToken::StringEnd,
+        string_text => ParserToken::StringText(<&'input str>),
+        single_quote_string => ParserToken::SingleQuoteString(<&'input str>),
+        dollar => ParserToken::Dollar,
+
+        // Prompt operators
+        "think" => ParserToken::Think,
+        "ask" => ParserToken::Ask,
+        "do" => ParserToken::Do,
+
+        // Keywords
+        "import" => ParserToken::Import,
+        "from" => ParserToken::From,
+        "var" => ParserToken::Var,
+        "if" => ParserToken::If,
+        "else" => ParserToken::Else,
+        "for" => ParserToken::For,
+        "while" => ParserToken::While,
+        "await" => ParserToken::Await,
+        "task" => ParserToken::Task,
+        "skill" => ParserToken::Skill,
+        "fun" => ParserToken::Fun,
+        "type" => ParserToken::Type,
+        "return" => ParserToken::Return,
+        "succeed" => ParserToken::Succeed,
+        "fail" => ParserToken::Fail,
+        "break" => ParserToken::Break,
+        "self" => ParserToken::SelfKw,
+        "in" => ParserToken::In,
+
+        // Literals
+        "true" => ParserToken::True,
+        "false" => ParserToken::False,
+        number => ParserToken::Number(<&'input str>),
+        identifier => ParserToken::Identifier(<&'input str>),
+
+        // Multi-character operators
+        "..." => ParserToken::Ellipsis,
+        "->" => ParserToken::Arrow,
+        "==" => ParserToken::Eq,
+        "!=" => ParserToken::Neq,
+        "<=" => ParserToken::Lte,
+        ">=" => ParserToken::Gte,
+        "&&" => ParserToken::AndAnd,
+        "||" => ParserToken::OrOr,
+
+        // Punctuation
+        "{" => ParserToken::LBrace,
+        "}" => ParserToken::RBrace,
+        "(" => ParserToken::LParen,
+        ")" => ParserToken::RParen,
+        "[" => ParserToken::LBracket,
+        "]" => ParserToken::RBracket,
+        ";" => ParserToken::Semicolon,
+        "," => ParserToken::Comma,
+        ":" => ParserToken::Colon,
+        "@" => ParserToken::At,
+
+        // Single-character operators
+        "<" => ParserToken::Lt,
+        ">" => ParserToken::Gt,
+        "+" => ParserToken::Plus,
+        "-" => ParserToken::Minus,
+        "*" => ParserToken::Star,
+        "/" => ParserToken::Slash,
+        "%" => ParserToken::Percent,
+        "!" => ParserToken::Bang,
+        "=" => ParserToken::Assign,
+        "|" => ParserToken::Pipe,
+        "&" => ParserToken::Ampersand,
+        "." => ParserToken::Dot,
+
+        // Prompt text
+        prompt_text => ParserToken::PromptText(<&'input str>),
+
+        // Comments
+        comment => ParserToken::Comment(<&'input str>),
+
+        // Special
+        end => ParserToken::End,
+    }
+}
+
+// Minimal grammar - just parse End token to verify build works
+pub Program: () = {
+    end => (),
+};

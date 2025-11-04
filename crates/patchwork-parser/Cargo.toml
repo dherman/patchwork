@@ -1,0 +1,16 @@
+[package]
+name = "patchwork-parser"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+patchwork-lexer = { path = "../patchwork-lexer" }
+lalrpop-util = { version = "0.21", features = ["lexer"] }
+try-next = "0.4"
+parlex = "0.3.0"
+
+[build-dependencies]
+lalrpop = "0.21"
+
+[dev-dependencies]
+# Will add test dependencies as needed
