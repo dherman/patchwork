@@ -204,14 +204,16 @@ This document breaks down the implementation of the patchwork parser into concre
 
 ---
 
-### Milestone 4: Basic Expressions
+### Milestone 4: Basic Expressions ✅
 
 **Goal:** Parse literals, binary operations, function calls, and member access.
+
+**Status:** COMPLETE
 
 **Tasks:**
 
 1. **Extend Expr enum with literals**
-   - [ ] Add variants:
+   - [x] Add variants:
      - `Identifier(&'input str)`
      - `Number(&'input str)`
      - `String(StringLiteral)` (simple version without interpolation)
@@ -219,7 +221,7 @@ This document breaks down the implementation of the patchwork parser into concre
      - `False`
 
 2. **Add operators and complex expressions**
-   - [ ] Add variants:
+   - [x] Add variants:
      - `Binary { op: BinOp, left: Box<Expr>, right: Box<Expr> }`
      - `Unary { op: UnOp, operand: Box<Expr> }`
      - `Call { callee: Box<Expr>, args: Vec<Expr> }`
@@ -227,35 +229,49 @@ This document breaks down the implementation of the patchwork parser into concre
      - `Index { object: Box<Expr>, index: Box<Expr> }`
 
 3. **Define operator enums**
-   - [ ] `BinOp`: Add, Sub, Mul, Div, Eq, NotEq, Lt, Gt, And, Or, Assign, Pipe, Range
-   - [ ] `UnOp`: Not, Neg
+   - [x] `BinOp`: Add, Sub, Mul, Div, Eq, NotEq, Lt, Gt, And, Or, Assign, Pipe, Range
+   - [x] `UnOp`: Not, Neg
 
 4. **Add expression grammar rules**
-   - [ ] Literals: identifier, number, string (no interpolation yet), true, false
-   - [ ] Binary operations with precedence:
-     - Pipe: `||` (lowest)
-     - Logical: `&&`, `||`
-     - Comparison: `==`, `!=`, `<`, `>`
-     - Arithmetic: `+`, `-`, `*`, `/`
-     - Range: `...`
-   - [ ] Unary: `!`, `-`
-   - [ ] Call: `Expr "(" (Expr ("," Expr)*)? ")"`
-   - [ ] Member: `Expr "." identifier`
-   - [ ] Parenthesized: `"(" Expr ")"`
+   - [x] Literals: identifier, number, string (no interpolation yet), true, false, self
+   - [x] Binary operations with precedence (manual precedence climbing):
+     - Assignment: `=` (right-associative, lowest)
+     - Pipe: `|` (left-associative)
+     - Logical OR: `||` (left-associative)
+     - Logical AND: `&&` (left-associative)
+     - Comparison: `==`, `!=`, `<`, `>` (left-associative)
+     - Range: `...` (left-associative)
+     - Arithmetic: `+`, `-` (left-associative)
+     - Multiplicative: `*`, `/` (left-associative)
+   - [x] Unary: `!`, `-` (right-associative)
+   - [x] Call: `Expr "(" (Expr ("," Expr)*)? ")"`
+   - [x] Member: `Expr "." identifier`
+   - [x] Index: `Expr "[" Expr "]"`
+   - [x] Parenthesized: `"(" Expr ")"`
 
 5. **Define StringLiteral (simple version)**
-   - [ ] `StringLiteral<'input>` struct with single text field (no interpolation)
-   - [ ] Grammar: Match StringStart, StringEnd (ignore StringText for now)
+   - [x] `StringLiteral<'input>` struct with single text field (no interpolation)
+   - [x] Grammar: Match StringStart, StringText, StringEnd
 
 6. **Test expression parsing**
-   - [ ] Test: Literals (`42`, `"hello"`, `true`, `foo`)
-   - [ ] Test: Binary ops (`1 + 2`, `x == y`, `a && b`)
-   - [ ] Test: Precedence (`1 + 2 * 3` → correct AST)
-   - [ ] Test: Unary (`!x`, `-5`)
-   - [ ] Test: Calls (`log(a, b, c)`)
-   - [ ] Test: Member access (`commit.num`, `plan.length`)
-   - [ ] Test: Combined (`self.receive(timeout)`)
-   - [ ] Test: Range (`1...3`)
+   - [x] Test: Literals (`42`, `"hello"`, `true`, `foo`)
+   - [x] Test: Binary ops (`1 + 2`, `x == y`, `a && b`)
+   - [x] Test: Precedence (`1 + 2 * 3` → correct AST)
+   - [x] Test: Unary (`!x`, `-5`)
+   - [x] Test: Calls (`log(a, b, c)`)
+   - [x] Test: Member access (`commit.num`, `plan.length`)
+   - [x] Test: Method calls (`self.receive(timeout)`)
+   - [x] Test: Index access (`arr[i]`, `data[0]`)
+   - [x] Test: Range (`1...3`)
+   - [x] Test: Parenthesized expressions (`(x + y) * z`)
+   - [x] Test: Complex nested expressions (`self.receive(timeout).status == "success"`)
+
+**Implementation notes:**
+- Used manual precedence climbing instead of lalrpop's #[precedence] annotations for better control and clarity
+- Each precedence tier is a separate grammar rule (AssignExpr → PipeExpr → OrExpr → ... → UnaryExpr → PostfixExpr → PrimaryExpr)
+- This approach avoids shift/reduce conflicts and makes precedence explicit
+- Added support for `self` keyword as an identifier
+- 38 tests passing (24 from M1-3 + 14 new M4 tests)
 
 **Success criteria:**
 - ✅ All basic expression types parse

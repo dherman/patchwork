@@ -117,6 +117,42 @@ pub enum TypeExpr<'input> {
     Name(&'input str),
 }
 
+/// Binary operator
+#[derive(Debug, Clone, PartialEq)]
+pub enum BinOp {
+    // Arithmetic
+    Add,      // +
+    Sub,      // -
+    Mul,      // *
+    Div,      // /
+    // Comparison
+    Eq,       // ==
+    NotEq,    // !=
+    Lt,       // <
+    Gt,       // >
+    // Logical
+    And,      // &&
+    Or,       // ||
+    // Other
+    Pipe,     // |
+    Range,    // ...
+    Assign,   // =
+}
+
+/// Unary operator
+#[derive(Debug, Clone, PartialEq)]
+pub enum UnOp {
+    Not,      // !
+    Neg,      // -
+}
+
+/// String literal (Milestone 4: simple version without interpolation)
+#[derive(Debug, Clone, PartialEq)]
+pub struct StringLiteral<'input> {
+    /// For Milestone 4, just store the text content (no interpolation)
+    pub text: &'input str,
+}
+
 /// Expression (Milestone 3: minimal set for statement support, expanded in Milestone 4)
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr<'input> {
@@ -124,10 +160,40 @@ pub enum Expr<'input> {
     Identifier(&'input str),
     /// Number literal: `42`, `3.14`
     Number(&'input str),
+    /// String literal: `"hello"`
+    String(StringLiteral<'input>),
     /// Boolean literal: `true`
     True,
     /// Boolean literal: `false`
     False,
+    /// Binary operation: `a + b`, `x == y`
+    Binary {
+        op: BinOp,
+        left: Box<Expr<'input>>,
+        right: Box<Expr<'input>>,
+    },
+    /// Unary operation: `!x`, `-5`
+    Unary {
+        op: UnOp,
+        operand: Box<Expr<'input>>,
+    },
+    /// Function call: `foo(a, b, c)`
+    Call {
+        callee: Box<Expr<'input>>,
+        args: Vec<Expr<'input>>,
+    },
+    /// Member access: `obj.field`
+    Member {
+        object: Box<Expr<'input>>,
+        field: &'input str,
+    },
+    /// Index access: `arr[i]`
+    Index {
+        object: Box<Expr<'input>>,
+        index: Box<Expr<'input>>,
+    },
+    /// Parenthesized expression: `(expr)`
+    Paren(Box<Expr<'input>>),
     /// Placeholder for unparsed expressions (temporary for incremental implementation)
     Placeholder(PhantomData<&'input ()>),
 }

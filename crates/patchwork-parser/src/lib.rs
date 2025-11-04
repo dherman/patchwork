@@ -663,4 +663,438 @@ mod tests {
         assert!(matches!(func.body.statements[1], Statement::Expr(Expr::Number(_))));
         assert!(matches!(func.body.statements[2], Statement::Expr(Expr::True)));
     }
+
+    // ==================== Milestone 4: Basic Expressions ====================
+
+    #[test]
+    fn test_literals() {
+        let input = r#"
+            fun test() {
+                42
+                "hello"
+                true
+                false
+                foo
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse literals: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        assert_eq!(func.body.statements.len(), 5);
+        assert!(matches!(func.body.statements[0], Statement::Expr(Expr::Number("42"))));
+        assert!(matches!(func.body.statements[1], Statement::Expr(Expr::String(_))));
+        assert!(matches!(func.body.statements[2], Statement::Expr(Expr::True)));
+        assert!(matches!(func.body.statements[3], Statement::Expr(Expr::False)));
+        assert!(matches!(func.body.statements[4], Statement::Expr(Expr::Identifier("foo"))));
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let input = r#"
+            fun test() {
+                var x = "hello"
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse string literal: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { name, init, .. } => {
+                assert_eq!(*name, "x");
+                match init.as_ref().unwrap() {
+                    Expr::String(s) => assert_eq!(s.text, "hello"),
+                    _ => panic!("Expected string literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_binary_arithmetic() {
+        let input = r#"
+            fun test() {
+                1 + 2
+                x - y
+                a * b
+                c / d
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse binary arithmetic: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        assert_eq!(func.body.statements.len(), 4);
+
+        // Check first binary op: 1 + 2
+        match &func.body.statements[0] {
+            Statement::Expr(Expr::Binary { op, .. }) => {
+                assert!(matches!(op, BinOp::Add));
+            }
+            _ => panic!("Expected binary expression"),
+        }
+    }
+
+    #[test]
+    fn test_operator_precedence() {
+        // Test that 1 + 2 * 3 parses as 1 + (2 * 3), not (1 + 2) * 3
+        let input = r#"
+            fun test() {
+                var x = 1 + 2 * 3
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse precedence: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { init, .. } => {
+                match init.as_ref().unwrap() {
+                    // Should be: Add(1, Mul(2, 3))
+                    Expr::Binary { op: BinOp::Add, left, right } => {
+                        // Left should be 1
+                        assert!(matches!(**left, Expr::Number("1")));
+                        // Right should be 2 * 3
+                        match &**right {
+                            Expr::Binary { op: BinOp::Mul, .. } => {},
+                            _ => panic!("Expected multiplication on right side"),
+                        }
+                    }
+                    _ => panic!("Expected Add binary expression"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_comparison_operators() {
+        let input = r#"
+            fun test() {
+                x == y
+                a != b
+                c < d
+                e > f
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse comparisons: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        assert_eq!(func.body.statements.len(), 4);
+
+        let ops = vec![BinOp::Eq, BinOp::NotEq, BinOp::Lt, BinOp::Gt];
+        for (i, expected_op) in ops.iter().enumerate() {
+            match &func.body.statements[i] {
+                Statement::Expr(Expr::Binary { op, .. }) => {
+                    assert_eq!(op, expected_op);
+                }
+                _ => panic!("Expected binary expression"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_logical_operators() {
+        let input = r#"
+            fun test() {
+                a && b
+                x || y
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse logical ops: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        assert_eq!(func.body.statements.len(), 2);
+
+        match &func.body.statements[0] {
+            Statement::Expr(Expr::Binary { op: BinOp::And, .. }) => {},
+            _ => panic!("Expected && expression"),
+        }
+
+        match &func.body.statements[1] {
+            Statement::Expr(Expr::Binary { op: BinOp::Or, .. }) => {},
+            _ => panic!("Expected || expression"),
+        }
+    }
+
+    #[test]
+    fn test_unary_operators() {
+        let input = r#"
+            fun test() {
+                !x
+                -5
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse unary ops: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        assert_eq!(func.body.statements.len(), 2);
+
+        match &func.body.statements[0] {
+            Statement::Expr(Expr::Unary { op: UnOp::Not, .. }) => {},
+            _ => panic!("Expected ! expression"),
+        }
+
+        match &func.body.statements[1] {
+            Statement::Expr(Expr::Unary { op: UnOp::Neg, .. }) => {},
+            _ => panic!("Expected - expression"),
+        }
+    }
+
+    #[test]
+    fn test_function_call() {
+        let input = r#"
+            fun test() {
+                log(a, b, c)
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse function call: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::Expr(Expr::Call { callee, args }) => {
+                match &**callee {
+                    Expr::Identifier(name) => assert_eq!(*name, "log"),
+                    _ => panic!("Expected identifier as callee"),
+                }
+                assert_eq!(args.len(), 3);
+            }
+            _ => panic!("Expected function call"),
+        }
+    }
+
+    #[test]
+    fn test_member_access() {
+        let input = r#"
+            fun test() {
+                commit.num
+                plan.length
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse member access: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        assert_eq!(func.body.statements.len(), 2);
+
+        match &func.body.statements[0] {
+            Statement::Expr(Expr::Member { object, field }) => {
+                match &**object {
+                    Expr::Identifier(name) => assert_eq!(*name, "commit"),
+                    _ => panic!("Expected identifier as object"),
+                }
+                assert_eq!(*field, "num");
+            }
+            _ => panic!("Expected member access"),
+        }
+    }
+
+    #[test]
+    fn test_method_call() {
+        let input = r#"
+            fun test() {
+                self.receive(timeout)
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse method call: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::Expr(Expr::Call { callee, args }) => {
+                // Callee should be self.receive
+                match &**callee {
+                    Expr::Member { object, field } => {
+                        match &**object {
+                            Expr::Identifier(name) => assert_eq!(*name, "self"),
+                            _ => panic!("Expected self as object"),
+                        }
+                        assert_eq!(*field, "receive");
+                    }
+                    _ => panic!("Expected member access as callee"),
+                }
+                assert_eq!(args.len(), 1);
+            }
+            _ => panic!("Expected call expression"),
+        }
+    }
+
+    #[test]
+    fn test_index_access() {
+        let input = r#"
+            fun test() {
+                arr[i]
+                data[0]
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse index access: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        assert_eq!(func.body.statements.len(), 2);
+
+        match &func.body.statements[0] {
+            Statement::Expr(Expr::Index { object, index }) => {
+                match &**object {
+                    Expr::Identifier(name) => assert_eq!(*name, "arr"),
+                    _ => panic!("Expected identifier as object"),
+                }
+                match &**index {
+                    Expr::Identifier(name) => assert_eq!(*name, "i"),
+                    _ => panic!("Expected identifier as index"),
+                }
+            }
+            _ => panic!("Expected index access"),
+        }
+    }
+
+    #[test]
+    fn test_range_operator() {
+        let input = r#"
+            fun test() {
+                1...3
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse range: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::Expr(Expr::Binary { op: BinOp::Range, left, right }) => {
+                assert!(matches!(**left, Expr::Number("1")));
+                assert!(matches!(**right, Expr::Number("3")));
+            }
+            _ => panic!("Expected range expression"),
+        }
+    }
+
+    #[test]
+    fn test_parenthesized_expr() {
+        let input = r#"
+            fun test() {
+                (x + y) * z
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse parenthesized expr: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        // Should parse as Mul(Paren(Add(x, y)), z)
+        match &func.body.statements[0] {
+            Statement::Expr(Expr::Binary { op: BinOp::Mul, left, right }) => {
+                match &**left {
+                    Expr::Paren(inner) => {
+                        match &**inner {
+                            Expr::Binary { op: BinOp::Add, .. } => {},
+                            _ => panic!("Expected Add inside parens"),
+                        }
+                    }
+                    _ => panic!("Expected parenthesized expression"),
+                }
+                assert!(matches!(**right, Expr::Identifier("z")));
+            }
+            _ => panic!("Expected multiplication"),
+        }
+    }
+
+    #[test]
+    fn test_complex_nested_expression() {
+        let input = r#"
+            fun test() {
+                var x = self.receive(timeout).status == "success"
+            }
+        "#;
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse complex expression: {:?}", result);
+
+        let program = result.unwrap();
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        // Should parse successfully - verify it's a var decl with a complex init
+        match &func.body.statements[0] {
+            Statement::VarDecl { init, .. } => {
+                assert!(init.is_some(), "Expected init expression");
+                // It should be an Eq comparison
+                match init.as_ref().unwrap() {
+                    Expr::Binary { op: BinOp::Eq, .. } => {},
+                    _ => panic!("Expected == comparison at top level"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
 }

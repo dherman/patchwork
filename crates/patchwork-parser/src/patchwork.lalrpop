@@ -308,10 +308,184 @@ TypeExpr: TypeExpr<'input> = {
     <identifier> => TypeExpr::Name(<>),
 };
 
-// Expression (Milestone 3: minimal set - identifiers, literals)
-Expr: Expr<'input> = {
+// Expression with precedence (Milestone 4)
+// Manual precedence climbing approach for clarity
+Expr: Expr<'input> = { AssignExpr };
+
+// Assignment (right-associative)
+AssignExpr: Expr<'input> = {
+    <left:PipeExpr> "=" <right:AssignExpr> => Expr::Binary {
+        op: BinOp::Assign,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    PipeExpr,
+};
+
+// Pipe operator
+PipeExpr: Expr<'input> = {
+    <left:PipeExpr> "|" <right:OrExpr> => Expr::Binary {
+        op: BinOp::Pipe,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    OrExpr,
+};
+
+// Logical OR
+OrExpr: Expr<'input> = {
+    <left:OrExpr> "||" <right:AndExpr> => Expr::Binary {
+        op: BinOp::Or,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    AndExpr,
+};
+
+// Logical AND
+AndExpr: Expr<'input> = {
+    <left:AndExpr> "&&" <right:CompExpr> => Expr::Binary {
+        op: BinOp::And,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    CompExpr,
+};
+
+// Comparison operators
+CompExpr: Expr<'input> = {
+    <left:CompExpr> "==" <right:RangeExpr> => Expr::Binary {
+        op: BinOp::Eq,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    <left:CompExpr> "!=" <right:RangeExpr> => Expr::Binary {
+        op: BinOp::NotEq,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    <left:CompExpr> "<" <right:RangeExpr> => Expr::Binary {
+        op: BinOp::Lt,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    <left:CompExpr> ">" <right:RangeExpr> => Expr::Binary {
+        op: BinOp::Gt,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    RangeExpr,
+};
+
+// Range operator
+RangeExpr: Expr<'input> = {
+    <left:RangeExpr> "..." <right:AddExpr> => Expr::Binary {
+        op: BinOp::Range,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    AddExpr,
+};
+
+// Addition/Subtraction
+AddExpr: Expr<'input> = {
+    <left:AddExpr> "+" <right:MulExpr> => Expr::Binary {
+        op: BinOp::Add,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    <left:AddExpr> "-" <right:MulExpr> => Expr::Binary {
+        op: BinOp::Sub,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    MulExpr,
+};
+
+// Multiplication/Division
+MulExpr: Expr<'input> = {
+    <left:MulExpr> "*" <right:UnaryExpr> => Expr::Binary {
+        op: BinOp::Mul,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    <left:MulExpr> "/" <right:UnaryExpr> => Expr::Binary {
+        op: BinOp::Div,
+        left: Box::new(left),
+        right: Box::new(right),
+    },
+    UnaryExpr,
+};
+
+// Unary operators
+UnaryExpr: Expr<'input> = {
+    "!" <operand:UnaryExpr> => Expr::Unary {
+        op: UnOp::Not,
+        operand: Box::new(operand),
+    },
+    "-" <operand:UnaryExpr> => Expr::Unary {
+        op: UnOp::Neg,
+        operand: Box::new(operand),
+    },
+    PostfixExpr,
+};
+
+// Postfix expressions: member access, call, index
+// These are left-associative and have the same precedence
+PostfixExpr: Expr<'input> = {
+    // Member access: obj.field
+    <object:PostfixExpr> "." <field:identifier> => Expr::Member {
+        object: Box::new(object),
+        field,
+    },
+
+    // Function call: func(a, b, c)
+    <callee:PostfixExpr> "(" <args:ExprList> ")" => Expr::Call {
+        callee: Box::new(callee),
+        args,
+    },
+
+    // Index access: arr[i]
+    <object:PostfixExpr> "[" <index:Expr> "]" => Expr::Index {
+        object: Box::new(object),
+        index: Box::new(index),
+    },
+
+    // Primary expressions
+    <PrimaryExpr>,
+};
+
+// Primary expressions (atoms)
+PrimaryExpr: Expr<'input> = {
+    // Literals
     <identifier> => Expr::Identifier(<>),
     <number> => Expr::Number(<>),
+    <StringLiteral> => Expr::String(<>),
     "true" => Expr::True,
     "false" => Expr::False,
+    "self" => Expr::Identifier("self"),
+
+    // Parenthesized expression
+    "(" <e:Expr> ")" => Expr::Paren(Box::new(e)),
+};
+
+// String literal (simple version without interpolation)
+StringLiteral: StringLiteral<'input> = {
+    string_start <text:string_text?> string_end => StringLiteral {
+        text: text.unwrap_or(""),
+    },
+};
+
+// Expression list (for function arguments)
+ExprList: Vec<Expr<'input>> = {
+    // Empty list
+    => vec![],
+    // Single expr
+    <head:Expr> => vec![head],
+    // Multiple exprs
+    <head:Expr> <tail:("," <Expr>)+> => {
+        let mut exprs = vec![head];
+        exprs.extend(tail);
+        exprs
+    },
 };

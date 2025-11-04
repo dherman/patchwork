@@ -1,25 +1,26 @@
 {
-  "currentFocus": "Patchwork parser implementation - completed Milestone 3 (Simple Statements), ready for Milestone 4",
+  "currentFocus": "Patchwork parser implementation - completed Milestone 4 (Basic Expressions), ready for Milestone 5 (Prompt Expressions)",
   "recentAchievements": [
-    "Implemented all statement types: var decl, if/else, for, while, return, succeed/fail/break",
-    "Solved LR(1) ambiguity using Swift-style separators (newlines/semicolons separate statements)",
-    "All 24 tests passing with zero parser conflicts",
-    "Refactored tests from milestone-based to conceptual organization"
+    "Implemented full expression parsing: literals, binary/unary ops, calls, member access, indexing",
+    "Built manual precedence climbing grammar (10 tiers) avoiding lalrpop conflicts",
+    "Added 14 comprehensive tests covering all expression types including precedence validation",
+    "All 38 tests passing (24 from M1-3 + 14 new M4 tests), zero conflicts"
   ],
   "nextSteps": [
-    "Milestone 4: Basic Expressions (literals, binary ops, function calls, member access)",
-    "Implement operator precedence using lalrpop precedence declarations",
-    "Add string interpolation support"
+    "Milestone 5: Prompt Expressions (think/ask/do blocks - patchwork's unique features)",
+    "Implement PromptBlock and PromptItem AST types",
+    "Add grammar for prompt expressions with embedded code blocks"
   ],
-  "collaborativeState": "Productive flow - good back-and-forth on solving the semicolon ambiguity, David provided key insight about Swift's approach",
+  "collaborativeState": "Excellent momentum - tackled and solved lalrpop precedence challenges together, clean solution emerged",
   "keyInsights": [
-    "Swift-style separators: newlines SEPARATE statements, enabling `return\\nx` to parse as two statements while `return x` is one",
-    "Greedy matching in lalrpop works well for var decl variants (most specific first)",
-    "Test organization matters - conceptual themes > implementation milestones for long-term readability"
+    "Manual precedence climbing > lalrpop #[precedence] for complex grammars - explicit hierarchy prevents conflicts",
+    "Each precedence tier as separate rule: AssignExpr → PipeExpr → OrExpr → ... → PostfixExpr → PrimaryExpr",
+    "Keywords like 'self' need explicit grammar rules even when they seem like identifiers",
+    "Test-driven development caught the 'self' issue immediately"
   ],
   "criticalAwareness": [
-    "Newline tokens must stay visible to parser (filtered in adapter, not lexer)",
-    "Statement ordering in grammar matters for ambiguity resolution",
-    "Parser is zero-copy with lifetime 'input - maintain this pattern"
+    "Precedence: Assignment (lowest) → Pipe → OR → AND → Comparison → Range → Add/Sub → Mul/Div → Unary → Postfix (highest)",
+    "Zero-copy lifetime 'input pattern must be maintained throughout",
+    "StringLiteral is currently simple (no interpolation) - Milestone 6 will add ${} support"
   ]
 }
