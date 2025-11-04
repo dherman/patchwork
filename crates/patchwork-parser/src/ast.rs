@@ -146,11 +146,20 @@ pub enum UnOp {
     Neg,      // -
 }
 
-/// String literal (Milestone 4: simple version without interpolation)
+/// String literal (Milestone 6: with interpolation support)
 #[derive(Debug, Clone, PartialEq)]
 pub struct StringLiteral<'input> {
-    /// For Milestone 4, just store the text content (no interpolation)
-    pub text: &'input str,
+    /// Parts of the string - mixture of text and interpolated expressions
+    pub parts: Vec<StringPart<'input>>,
+}
+
+/// Part of a string literal - either text or an interpolated expression
+#[derive(Debug, Clone, PartialEq)]
+pub enum StringPart<'input> {
+    /// Plain text: `"hello"` or text between interpolations
+    Text(&'input str),
+    /// Interpolated expression: `${expr}`, `$(cmd)`, or `$id`
+    Interpolation(Box<Expr<'input>>),
 }
 
 /// Expression (Milestone 3: minimal set for statement support, expanded in Milestone 4)

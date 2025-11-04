@@ -714,7 +714,13 @@ mod tests {
             Statement::VarDecl { name, init, .. } => {
                 assert_eq!(*name, "x");
                 match init.as_ref().unwrap() {
-                    Expr::String(s) => assert_eq!(s.text, "hello"),
+                    Expr::String(s) => {
+                        assert_eq!(s.parts.len(), 1);
+                        match &s.parts[0] {
+                            StringPart::Text(text) => assert_eq!(*text, "hello"),
+                            _ => panic!("Expected text part"),
+                        }
+                    }
                     _ => panic!("Expected string literal"),
                 }
             }
@@ -1274,6 +1280,276 @@ mod tests {
         let input = r#"
             task foo() {
                 var x = think { analyze } || ask { what should I do? }
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        assert_eq!(program.items.len(), 1);
+    }
+
+    // ===== String Interpolation Tests (Milestone 6) =====
+
+    #[test]
+    fn test_string_interpolation_simple_id() {
+        // Test: $id form
+        let input = r#"
+            fun test() {
+                var greeting = "Hello $name"
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { init, .. } => {
+                match init.as_ref().unwrap() {
+                    Expr::String(s) => {
+                        assert_eq!(s.parts.len(), 2);
+                        match &s.parts[0] {
+                            StringPart::Text(text) => assert_eq!(*text, "Hello "),
+                            _ => panic!("Expected text part"),
+                        }
+                        match &s.parts[1] {
+                            StringPart::Interpolation(expr) => {
+                                match expr.as_ref() {
+                                    Expr::Identifier(id) => assert_eq!(*id, "name"),
+                                    _ => panic!("Expected identifier"),
+                                }
+                            }
+                            _ => panic!("Expected interpolation part"),
+                        }
+                    }
+                    _ => panic!("Expected string literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_string_interpolation_expr() {
+        // Test: ${expr} form
+        let input = r#"
+            fun test() {
+                var msg = "Total: ${x + y}"
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { init, .. } => {
+                match init.as_ref().unwrap() {
+                    Expr::String(s) => {
+                        assert_eq!(s.parts.len(), 2);
+                        match &s.parts[0] {
+                            StringPart::Text(text) => assert_eq!(*text, "Total: "),
+                            _ => panic!("Expected text part"),
+                        }
+                        match &s.parts[1] {
+                            StringPart::Interpolation(expr) => {
+                                match expr.as_ref() {
+                                    Expr::Binary { op: BinOp::Add, .. } => {},
+                                    _ => panic!("Expected binary add expression"),
+                                }
+                            }
+                            _ => panic!("Expected interpolation part"),
+                        }
+                    }
+                    _ => panic!("Expected string literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_string_interpolation_cmd() {
+        // Test: $(expr) form - parses expr as expression
+        // Note: The content is parsed as a patchwork expression
+        let input = r#"
+            fun test() {
+                var session = "session-$(timestamp)"
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { init, .. } => {
+                match init.as_ref().unwrap() {
+                    Expr::String(s) => {
+                        assert_eq!(s.parts.len(), 2);
+                        match &s.parts[0] {
+                            StringPart::Text(text) => assert_eq!(*text, "session-"),
+                            _ => panic!("Expected text part"),
+                        }
+                        match &s.parts[1] {
+                            StringPart::Interpolation(expr) => {
+                                match expr.as_ref() {
+                                    Expr::Identifier(id) => assert_eq!(*id, "timestamp"),
+                                    _ => panic!("Expected identifier"),
+                                }
+                            }
+                            _ => panic!("Expected interpolation part"),
+                        }
+                    }
+                    _ => panic!("Expected string literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_string_interpolation_multiple() {
+        // Test: Multiple interpolations in one string
+        let input = r#"
+            fun test() {
+                var msg = "Hello $first $last"
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { init, .. } => {
+                match init.as_ref().unwrap() {
+                    Expr::String(s) => {
+                        // "Hello ", $first, " ", $last
+                        assert_eq!(s.parts.len(), 4);
+                        match &s.parts[0] {
+                            StringPart::Text(text) => assert_eq!(*text, "Hello "),
+                            _ => panic!("Expected text part"),
+                        }
+                        match &s.parts[1] {
+                            StringPart::Interpolation(expr) => {
+                                match expr.as_ref() {
+                                    Expr::Identifier(id) => assert_eq!(*id, "first"),
+                                    _ => panic!("Expected identifier"),
+                                }
+                            }
+                            _ => panic!("Expected interpolation part"),
+                        }
+                        match &s.parts[2] {
+                            StringPart::Text(text) => assert_eq!(*text, " "),
+                            _ => panic!("Expected text part"),
+                        }
+                        match &s.parts[3] {
+                            StringPart::Interpolation(expr) => {
+                                match expr.as_ref() {
+                                    Expr::Identifier(id) => assert_eq!(*id, "last"),
+                                    _ => panic!("Expected identifier"),
+                                }
+                            }
+                            _ => panic!("Expected interpolation part"),
+                        }
+                    }
+                    _ => panic!("Expected string literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_string_interpolation_all_forms() {
+        // Test: Mix of $id, ${expr}, and $(expr)
+        let input = r#"
+            fun test() {
+                var path = "$base/${work_dir}/state-$(timestamp).json"
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+        let func = match &program.items[0] {
+            Item::Function(f) => f,
+            _ => panic!("Expected function"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { init, .. } => {
+                match init.as_ref().unwrap() {
+                    Expr::String(s) => {
+                        // $base, "/", ${work_dir}, "/state-", $(timestamp), ".json"
+                        assert_eq!(s.parts.len(), 6);
+
+                        // $base
+                        match &s.parts[0] {
+                            StringPart::Interpolation(expr) => {
+                                match expr.as_ref() {
+                                    Expr::Identifier(id) => assert_eq!(*id, "base"),
+                                    _ => panic!("Expected identifier"),
+                                }
+                            }
+                            _ => panic!("Expected interpolation part"),
+                        }
+
+                        // "/"
+                        match &s.parts[1] {
+                            StringPart::Text(text) => assert_eq!(*text, "/"),
+                            _ => panic!("Expected text part"),
+                        }
+
+                        // ${work_dir}
+                        match &s.parts[2] {
+                            StringPart::Interpolation(expr) => {
+                                match expr.as_ref() {
+                                    Expr::Identifier(id) => assert_eq!(*id, "work_dir"),
+                                    _ => panic!("Expected identifier"),
+                                }
+                            }
+                            _ => panic!("Expected interpolation part"),
+                        }
+
+                        // "/state-"
+                        match &s.parts[3] {
+                            StringPart::Text(text) => assert_eq!(*text, "/state-"),
+                            _ => panic!("Expected text part"),
+                        }
+
+                        // $(timestamp)
+                        match &s.parts[4] {
+                            StringPart::Interpolation(expr) => {
+                                match expr.as_ref() {
+                                    Expr::Identifier(id) => assert_eq!(*id, "timestamp"),
+                                    _ => panic!("Expected identifier"),
+                                }
+                            }
+                            _ => panic!("Expected interpolation part"),
+                        }
+
+                        // ".json"
+                        match &s.parts[5] {
+                            StringPart::Text(text) => assert_eq!(*text, ".json"),
+                            _ => panic!("Expected text part"),
+                        }
+                    }
+                    _ => panic!("Expected string literal"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_string_interpolation_historian_examples() {
+        // Test: Real examples from historian
+        let input = r#"
+            fun test() {
+                var session = "historian-${timestamp}"
+                var tmp_dir = "/tmp/${session_id}"
+                var state_file = "${work_dir}/state.json"
             }
         "#;
         let program = parse(input).expect("Should parse");

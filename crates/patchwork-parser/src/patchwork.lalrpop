@@ -474,11 +474,25 @@ PrimaryExpr: Expr<'input> = {
     "(" <e:Expr> ")" => Expr::Paren(Box::new(e)),
 };
 
-// String literal (simple version without interpolation)
+// String literal with interpolation support
+// Parses: "text", "$id", "${expr}", "$(cmd)", or combinations
 StringLiteral: StringLiteral<'input> = {
-    string_start <text:string_text?> string_end => StringLiteral {
-        text: text.unwrap_or(""),
-    },
+    string_start <parts:StringPart*> string_end => StringLiteral { parts },
+};
+
+// A single part of a string - either text or interpolation
+StringPart: StringPart<'input> = {
+    // Plain text
+    <text:string_text> => StringPart::Text(text),
+
+    // Interpolation: $id form
+    dollar <id:identifier> => StringPart::Interpolation(Box::new(Expr::Identifier(id))),
+
+    // Interpolation: ${expr} form
+    dollar "{" <e:Expr> "}" => StringPart::Interpolation(Box::new(e)),
+
+    // Interpolation: $(cmd) form - parses as expression
+    dollar "(" <e:Expr> ")" => StringPart::Interpolation(Box::new(e)),
 };
 
 // Expression list (for function arguments)

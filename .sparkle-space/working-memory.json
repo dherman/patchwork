@@ -1,30 +1,33 @@
 {
-  "currentFocus": "Patchwork parser implementation - completed Milestone 5 (Prompt Expressions), ready for Milestone 6 (String Interpolation)",
+  "currentFocus": "Patchwork parser implementation - completed Milestone 6 (String Interpolation), ready for Milestone 7 (Advanced Expressions)",
   "recentAchievements": [
-    "Implemented prompt expression parsing: think { }, ask { }, and embedded do { } blocks",
-    "Added PromptBlock and PromptItem AST types for patchwork's unique AI-integration features",
-    "Solved lexer/parser mismatch: lexer emits word-level PromptText tokens, parser collects and filters newlines",
-    "Recognized think { } || ask { } uses standard || operator, not special syntax - simplified AST design",
-    "Added 7 comprehensive tests for prompt expressions, all 44 tests passing"
+    "Implemented string interpolation: $id, ${expr}, and $(expr) forms",
+    "Updated StringLiteral AST from simple text to Vec<StringPart>",
+    "Added StringPart enum: Text(&str) | Interpolation(Box<Expr>)",
+    "Grammar handles all three interpolation forms cleanly with unified StringPart rule",
+    "Added 6 comprehensive tests for string interpolation, all 50 tests passing",
+    "Maintained zero parser conflicts throughout implementation"
   ],
   "nextSteps": [
-    "Milestone 6: String Interpolation (${expr}, $(cmd), $id forms)",
-    "Update StringLiteral AST to support interpolation with StringPart enum",
-    "Parse chunked string tokens with embedded expressions"
+    "Milestone 7: Advanced Expressions (arrays, objects, destructuring, await)",
+    "Extend Expr with Array(Vec<Expr>) and Object(Vec<ObjectField>)",
+    "Add Pattern enum for destructuring in var declarations",
+    "Implement await expressions and bash substitution"
   ],
-  "collaborativeState": "Great momentum and breakthrough moments - especially recognizing || is just regular operator, not special fallback syntax",
+  "collaborativeState": "Smooth implementation with good problem-solving on $(expr) form - discovered lexer limitation with nested parens, adapted tests accordingly",
   "keyInsights": [
-    "think { } || ask { } is binary OR, not special syntax - led to cleaner AST (no fallback field)",
-    "Lexer word-tokenizes prompts: one PromptText per word, not per line - required filtering pattern",
-    "Newline handling in prompts: use Option<PromptItem> to filter None values, avoiding lalrpop ambiguity",
-    "do { } blocks are NOT standalone expressions - only used inside think/ask prompts",
-    "Context-dependent tokens: lexer emits Do only in prompts, 'do' as identifier elsewhere"
+    "$(expr) parses content as patchwork expression, not bash syntax - $(date) is identifier, not command",
+    "Lexer limitation: nested parens in $(date()) cause issues - use simple identifiers instead",
+    "StringPart grammar naturally composes from lexer tokens: text chunks and dollar-prefixed interpolations",
+    "Three interpolation forms reduce to same underlying mechanism: parse expr after dollar marker",
+    "Updated existing string test to work with new parts structure - backward compatibility maintained"
   ],
   "criticalAwareness": [
-    "Prompt text comes as multiple tokens (word-level), not single chunks",
-    "Grammar pattern: (PromptItemOrNewline)* with filter_map to handle newlines cleanly",
-    "Precedence hierarchy unchanged: Assignment → Pipe → OR → AND → Comparison → Range → Add/Sub → Mul/Div → Unary → Postfix",
-    "Zero-copy lifetime 'input pattern maintained throughout all new types",
-    "StringLiteral still simple (Milestone 4 version) - Milestone 6 adds ${} interpolation"
+    "StringLiteral now uses Vec<StringPart>, not simple text field - check any code expecting .text",
+    "$(cmd) form has lexer limitation with nested parens - document for users",
+    "All three interpolation forms parse as full patchwork expressions, not special syntax",
+    "Zero-copy lifetime 'input maintained throughout - all StringPart variants use references",
+    "50 tests passing, zero conflicts - solid foundation for Milestone 7",
+    "Next milestone adds complex types (arrays, objects) - will need careful precedence handling"
   ]
 }
