@@ -1,8 +1,8 @@
-// Minimal patchwork grammar to verify lalrpop build chain
-// This is Milestone 1 - just infrastructure, no real parsing yet
+// Patchwork grammar - Milestone 2: Top-level items and block structure
 
 use crate::token::ParserToken;
 use crate::adapter::ParseError;
+use crate::ast::*;
 
 grammar<'input>(input: &'input str);
 
@@ -101,7 +101,81 @@ extern {
     }
 }
 
-// Minimal grammar - just parse End token to verify build works
-pub Program: () = {
-    end => (),
+// ====================
+// Grammar Rules
+// ====================
+
+// Program: top-level items
+pub Program: Program<'input> = {
+    <items:Item*> end => Program { items },
+};
+
+// Top-level item
+Item: Item<'input> = {
+    <ImportDecl> => Item::Import(<>),
+    <SkillDecl> => Item::Skill(<>),
+    <TaskDecl> => Item::Task(<>),
+    <FunctionDecl> => Item::Function(<>),
+};
+
+// Import declaration: `import path` or `import ./{a, b, c}`
+ImportDecl: ImportDecl<'input> = {
+    "import" <path:ImportPath> => ImportDecl { path },
+};
+
+// Import path
+ImportPath: ImportPath<'input> = {
+    // Relative multi-import: ./{analyst, narrator, scribe}
+    "." "/" "{" <head:identifier> <tail:("," <identifier>)*> "}" => {
+        let mut names = vec![head];
+        names.extend(tail);
+        ImportPath::RelativeMulti(names)
+    },
+    // Simple dotted path: For now, just accept identifier sequences
+    // Will expand this in later milestones if needed
+    <id:identifier> => ImportPath::Simple(vec![id]),
+};
+
+// Skill declaration: skill name(params) { body }
+SkillDecl: SkillDecl<'input> = {
+    "skill" <name:identifier> "(" <params:ParamList> ")" <body:Block> => {
+        SkillDecl { name, params, body }
+    },
+};
+
+// Task declaration: task name(params) { body }
+TaskDecl: TaskDecl<'input> = {
+    "task" <name:identifier> "(" <params:ParamList> ")" <body:Block> => {
+        TaskDecl { name, params, body }
+    },
+};
+
+// Function declaration: fun name(params) { body }
+FunctionDecl: FunctionDecl<'input> = {
+    "fun" <name:identifier> "(" <params:ParamList> ")" <body:Block> => {
+        FunctionDecl { name, params, body }
+    },
+};
+
+// Parameter list (comma-separated identifiers)
+ParamList: Vec<Param<'input>> = {
+    // Empty list
+    => vec![],
+    // Single param
+    <head:identifier> => vec![Param { name: head }],
+    // Multiple params
+    <head:identifier> <tail:("," <identifier>)+> => {
+        let mut params = vec![Param { name: head }];
+        for name in tail {
+            params.push(Param { name });
+        }
+        params
+    },
+};
+
+// Block: { statements }
+// For Milestone 2, we only recognize empty blocks
+// Statement parsing will be added in Milestone 3
+Block: Block<'input> = {
+    "{" "}" => Block { statements: vec![] },
 };

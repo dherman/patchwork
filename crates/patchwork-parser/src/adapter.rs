@@ -164,20 +164,27 @@ where
     type Item = Result<(usize, ParserToken<'input>, usize), ParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.lexer.try_next_with_context(&mut self.context) {
-            Ok(Some(token)) => {
-                let span = token.span.unwrap_or_else(|| {
-                    // Default span if none provided
-                    parlex::Span { start: parlex::Position::default(), end: parlex::Position::default() }
-                });
-                // Convert line/column positions to byte offsets using cached line starts
-                let start = position_to_offset(self.input, &self.line_starts, span.start.line, span.start.column);
-                let end = position_to_offset(self.input, &self.line_starts, span.end.line, span.end.column);
-                let parser_token = self.convert_token(token.rule, start, end);
-                Some(Ok((start, parser_token, end)))
+        loop {
+            match self.lexer.try_next_with_context(&mut self.context) {
+                Ok(Some(token)) => {
+                    // Skip whitespace, newlines, and comments
+                    if matches!(token.rule, Rule::Whitespace | Rule::Newline | Rule::Comment) {
+                        continue;
+                    }
+
+                    let span = token.span.unwrap_or_else(|| {
+                        // Default span if none provided
+                        parlex::Span { start: parlex::Position::default(), end: parlex::Position::default() }
+                    });
+                    // Convert line/column positions to byte offsets using cached line starts
+                    let start = position_to_offset(self.input, &self.line_starts, span.start.line, span.start.column);
+                    let end = position_to_offset(self.input, &self.line_starts, span.end.line, span.end.column);
+                    let parser_token = self.convert_token(token.rule, start, end);
+                    return Some(Ok((start, parser_token, end)));
+                }
+                Ok(None) => return None,
+                Err(e) => return Some(Err(ParseError::LexerError(e.to_string()))),
             }
-            Ok(None) => None,
-            Err(e) => Some(Err(ParseError::LexerError(e.to_string()))),
         }
     }
 }
