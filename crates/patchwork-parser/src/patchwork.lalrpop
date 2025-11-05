@@ -97,6 +97,20 @@ extern {
         // Comments
         comment => ParserToken::Comment(<&'input str>),
 
+        // Shell mode tokens (Milestone 10)
+        shell_arg => ParserToken::ShellArg(<&'input str>),
+        shell_redirect_out => ParserToken::ShellRedirectOut,
+        shell_redirect_append => ParserToken::ShellRedirectAppend,
+        shell_redirect_in => ParserToken::ShellRedirectIn,
+        shell_redirect_err => ParserToken::ShellRedirectErr,
+        shell_redirect_err_to_out => ParserToken::ShellRedirectErrToOut,
+        shell_pipe => ParserToken::ShellPipe,
+        shell_and => ParserToken::ShellAnd,
+        shell_or => ParserToken::ShellOr,
+        shell_background => ParserToken::ShellBackground,
+        shell_assign => ParserToken::ShellAssign,
+        shell_backslash => ParserToken::ShellBackslash,
+
         // Special
         end => ParserToken::End,
     }
@@ -248,6 +262,9 @@ Statement: Statement<'input> = {
     <FailStmt>,
     <BreakStmt>,
 
+    // Shell statement: $ command args (Milestone 10)
+    <ShellStmt>,
+
     // Command or expression statement - factored to avoid conflicts (Milestone 10)
     // This handles both bare commands (mkdir -p dir) and expression statements (x + y)
     <CommandOrExprStmt>,
@@ -313,6 +330,26 @@ FailStmt: Statement<'input> = {
 
 BreakStmt: Statement<'input> = {
     "break" => Statement::Break,
+};
+
+// Shell statement: $ command args (Milestone 10)
+// Parses: $ mkdir -p work_dir
+ShellStmt: Statement<'input> = {
+    dollar <args:CommandArgs> => {
+        // Extract command name from first arg
+        if let Some(first) = args.first() {
+            let name = match first {
+                CommandArg::Literal(s) => s,
+                CommandArg::String(_) => panic!("Shell command name cannot be a string"),
+            };
+            Statement::Expr(Expr::BareCommand {
+                name,
+                args: args[1..].to_vec()
+            })
+        } else {
+            panic!("Shell statement requires at least a command name")
+        }
+    },
 };
 
 // Command or expression statement (Milestone 10)
@@ -618,6 +655,39 @@ PrimaryExpr: Expr<'input> = {
     <AskExpr>,
     // Note: do { } is NOT a standalone expression - only used inside think/ask blocks
 
+    // Shell expressions (Milestone 10)
+    // Command substitution: $(command args) → returns stdout as string
+    dollar "(" <args:CommandArgs> ")" => {
+        if let Some(first) = args.first() {
+            let name = match first {
+                CommandArg::Literal(s) => s,
+                CommandArg::String(_) => panic!("Shell command name cannot be a string"),
+            };
+            Expr::CommandSubst {
+                name,
+                args: args[1..].to_vec()
+            }
+        } else {
+            panic!("Command substitution requires at least a command name")
+        }
+    },
+
+    // Shell expression: ($ command args) → returns exit code as boolean
+    "(" dollar <args:CommandArgs> ")" => {
+        if let Some(first) = args.first() {
+            let name = match first {
+                CommandArg::Literal(s) => s,
+                CommandArg::String(_) => panic!("Shell command name cannot be a string"),
+            };
+            Expr::BareCommand {
+                name,
+                args: args[1..].to_vec()
+            }
+        } else {
+            panic!("Shell expression requires at least a command name")
+        }
+    },
+
     // Parenthesized expression
     "(" <e:Expr> ")" => Expr::Paren(Box::new(e)),
 };
@@ -637,8 +707,42 @@ CommandArg: CommandArg<'input> = {
     // String argument with interpolation: "${work_dir}"
     <s:StringLiteral> => CommandArg::String(s),
 
-    // Literal arguments: identifiers and numbers only
-    // TODO(M10): Flags like -p need to be quoted for now: "-p"
+    // Variable interpolation in shell mode: $identifier, $shell_arg, or ${expr}
+    // In shell mode, after $, we might get shell_arg instead of identifier
+    dollar <id:identifier> => {
+        // Convert to a string literal with interpolation
+        CommandArg::String(StringLiteral {
+            parts: vec![StringPart::Interpolation(Box::new(Expr::Identifier(id)))]
+        })
+    },
+    dollar <arg:shell_arg> => {
+        // Treat shell_arg after $ as an identifier for interpolation
+        CommandArg::String(StringLiteral {
+            parts: vec![StringPart::Interpolation(Box::new(Expr::Identifier(arg)))]
+        })
+    },
+    dollar "{" <e:Expr> "}" => {
+        // ${expr} interpolation in shell mode
+        CommandArg::String(StringLiteral {
+            parts: vec![StringPart::Interpolation(Box::new(e))]
+        })
+    },
+
+    // Shell mode arguments: -p, --flag, file.txt, etc.
+    <arg:shell_arg> => CommandArg::Literal(arg),
+
+    // Shell operators (as literal arguments for simplicity)
+    shell_redirect_out => CommandArg::Literal(">"),
+    shell_redirect_append => CommandArg::Literal(">>"),
+    shell_redirect_in => CommandArg::Literal("<"),
+    shell_redirect_err => CommandArg::Literal("2>"),
+    shell_redirect_err_to_out => CommandArg::Literal("2>&1"),
+    shell_pipe => CommandArg::Literal("|"),
+    shell_and => CommandArg::Literal("&&"),
+    shell_or => CommandArg::Literal("||"),
+    shell_background => CommandArg::Literal("&"),
+
+    // Literal arguments: identifiers and numbers (for backwards compatibility)
     <id:identifier> => CommandArg::Literal(id),
     <num:number> => CommandArg::Literal(num),
 };
@@ -744,6 +848,10 @@ PromptItemOrNewline: Option<PromptItem<'input>> = {
 PromptItem: PromptItem<'input> = {
     // Raw prompt text
     <text:prompt_text> => PromptItem::Text(text),
+
+    // Variable interpolation: $identifier or ${expr}
+    dollar <id:identifier> => PromptItem::Interpolation(Expr::Identifier(id)),
+    dollar "{" <e:Expr> "}" => PromptItem::Interpolation(e),
 
     // Embedded do block within a prompt
     "do" "{" <statements:StatementList> "}" => PromptItem::Code(Block { statements }),

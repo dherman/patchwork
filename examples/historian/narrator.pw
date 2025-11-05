@@ -68,30 +68,30 @@ task narrator(session_id, work_dir) {
         type: "done"
     })
 
-    echo "done" > "${work_dir}/narrator/status"
+    $ echo "done" > "${work_dir}/narrator/status"
 
     log(session_id, "NARRATOR", "Complete! Created ${i} commits")
 }
 
 fun validate_trees(work_dir, branch, clean_branch) {
     # Compare tree hashes
-    git checkout "${clean_branch}"
+    $ git checkout "${clean_branch}"
     var clean_tree = $(git rev-parse HEAD^{tree}) # FIXME: what is {tree} here?
 
-    git checkout "${branch}"
+    $ git checkout "${branch}"
     var original_tree = $(git rev-parse HEAD^{tree})
 
-    if $clean_tree = $original_tree {
+    if clean_tree = original_tree {
           log(session_id, "NARRATOR", "Validation successful - trees match")
           return
     }
 
     log(session_id, "NARRATOR", "Trees don't match, applying remaining changes")
     # Switch back to clean branch
-    git checkout "${clean_branch}"
+    $ git checkout "${clean_branch}"
 
     # Get the diff of what's missing
-    git diff HEAD "${branch}" > "${work_dir}/remaining.diff"
+    $ git diff HEAD "${branch}" > "${work_dir}/remaining.diff"
 
     # Log what we're adding (with details)
     var remaining_diff=$(cat "${work_dir}/remaining.diff")
@@ -99,10 +99,10 @@ fun validate_trees(work_dir, branch, clean_branch) {
     log(session_id, "NARRATOR", "Remaining diff", remaining_diff)
 
     # Apply the remaining changes
-    git apply "${work_dir}/remaining.diff"
+    $ git apply "${work_dir}/remaining.diff"
 
     # Amend the last commit with the missing changes
-    git commit --amend --no-edit
+    $ git commit --amend --no-edit
 
     log(session_id, "NARRATOR", "Amended last commit with remaining changes")
 }

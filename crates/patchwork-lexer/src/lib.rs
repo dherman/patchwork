@@ -30,8 +30,12 @@ pub struct LexerContext {
     in_string_interpolation: bool,
     /// Track if we just saw a Dollar in Prompt mode (for interpolation)
     in_prompt_interpolation: bool,
+    /// Track if we just saw a Dollar in Shell mode (for interpolation)
+    in_shell_interpolation: bool,
     /// Track if we're in shell mode (for command parsing)
     in_shell_mode: bool,
+    /// Track if we should return to Shell mode after yielding current token
+    return_to_shell: bool,
 }
 
 impl LexerContext {
@@ -43,7 +47,9 @@ impl LexerContext {
             last_token: None,
             in_string_interpolation: false,
             in_prompt_interpolation: false,
+            in_shell_interpolation: false,
             in_shell_mode: false,
+            return_to_shell: false,
         }
     }
 
@@ -188,6 +194,7 @@ where
                 // If it's { or (, we'll handle that in LBrace/LParen
                 // If it's an identifier, we temporarily switch to Code mode
                 // In Code mode, $ followed by whitespace enters Shell mode
+                // In Shell mode, $ followed by identifier stays in Shell (identifier is now active in Shell)
                 let span = lexer.span();
                 let token = PatchworkToken::new(rule, Some(span));
                 lexer.yield_token(token);
@@ -202,11 +209,14 @@ where
                         context.in_prompt_interpolation = true;
                         lexer.begin(Mode::Code);
                     }
+                    Mode::Shell => {
+                        // $ in Shell mode for variable interpolation
+                        // Stay in Shell mode - the grammar will handle dollar shell_arg
+                    }
                     Mode::Code => {
                         // $ in Code mode might start shell mode
                         // We'll check next token (Whitespace or LParen) to decide
                     }
-                    _ => {}
                 }
                 context.last_token = Some(rule);
                 return Ok(());
@@ -285,6 +295,12 @@ where
                         context.push_mode(Mode::Code, DelimiterType::Brace);
                         // Stay in Code mode (already there from Dollar handling)
                     }
+                    Some(Rule::Dollar) if lexer.mode() == Mode::Shell || context.in_shell_mode => {
+                        // ${expression} in shell mode - switch to Code mode temporarily
+                        context.in_shell_interpolation = true;
+                        context.push_mode(Mode::Code, DelimiterType::Brace);
+                        lexer.begin(Mode::Code);
+                    }
                     _ => {
                         // Just increment depth for nested braces
                         context.increment_depth();
@@ -294,15 +310,23 @@ where
                 return Ok(());
             }
             Rule::LParen if context.last_token == Some(Rule::Dollar) => {
-                // $(command) - enter Shell mode for command substitution
+                // $(...) - behavior depends on current mode
                 let span = lexer.span();
                 let token = PatchworkToken::new(rule, Some(span));
                 lexer.yield_token(token);
 
-                // Enter Shell mode - will exit on matching )
-                context.push_mode(Mode::Shell, DelimiterType::Paren);
-                lexer.begin(Mode::Shell);
-                context.in_shell_mode = true;
+                // In Code mode: $(command) enters Shell mode for command substitution
+                // In InString/Prompt mode: $(expr) stays in Code mode for expression
+                if lexer.mode() == Mode::Code && !context.in_string_interpolation && !context.in_prompt_interpolation {
+                    // Code mode: enter Shell mode for command substitution
+                    context.push_mode(Mode::Shell, DelimiterType::Paren);
+                    lexer.begin(Mode::Shell);
+                    context.in_shell_mode = true;
+                } else {
+                    // InString/Prompt mode: stay in Code mode for expression
+                    context.push_mode(Mode::Code, DelimiterType::Paren);
+                    // Already in Code mode from Dollar handling
+                }
                 context.last_token = None;
                 return Ok(());
             }
@@ -392,10 +416,13 @@ where
                             } else if parent_mode == Mode::Prompt && context.in_prompt_interpolation {
                                 // Finished ${...} or $(...) in prompt, back to parent prompt
                                 context.in_prompt_interpolation = false;
+                            } else if parent_mode == Mode::Shell && context.in_shell_interpolation {
+                                // Finished ${...} in shell, back to parent shell
+                                context.in_shell_interpolation = false;
                             }
                             lexer.begin(parent_mode);
                         } else {
-                            // Back to Code, InString, or Prompt mode
+                            // Back to Code, InString, Prompt, or Shell mode
                             if context.in_string_interpolation {
                                 // Closing ${...} - return to InString
                                 context.in_string_interpolation = false;
@@ -404,6 +431,10 @@ where
                                 // Closing ${...} - return to Prompt
                                 context.in_prompt_interpolation = false;
                                 lexer.begin(Mode::Prompt);
+                            } else if context.in_shell_interpolation {
+                                // Closing ${...} - return to Shell
+                                context.in_shell_interpolation = false;
+                                lexer.begin(Mode::Shell);
                             } else {
                                 lexer.begin(Mode::Code);
                             }
@@ -1501,6 +1532,23 @@ var session_id = "historian-${timestamp}""#;
         assert!(tokens.contains(&Rule::LBrace));
         assert!(tokens.contains(&Rule::RBrace));
         assert!(tokens.contains(&Rule::End));
+        Ok(())
+    }
+
+    #[test]
+    fn test_shell_mode_dollar_interpolation() -> Result<(), ParlexError> {
+        let input = "$ git diff ${base_commit}..HEAD\n";
+        let tokens = collect_tokens(input)?;
+        // Debug: print actual tokens
+        eprintln!("Actual tokens: {:?}", tokens);
+        // ${base_commit} requires switching to Code mode temporarily
+        // but for now we're keeping it simple - test that it at least lexes
+        assert!(tokens.contains(&Rule::Dollar));
+        assert!(tokens.contains(&Rule::ShellArg));
+        assert!(tokens.contains(&Rule::LBrace), "Missing LBrace in tokens: {:?}", tokens);
+        assert!(tokens.contains(&Rule::Identifier));  // base_commit in Code mode
+        assert!(tokens.contains(&Rule::RBrace));
+        assert!(tokens.contains(&Rule::Newline));
         Ok(())
     }
 }

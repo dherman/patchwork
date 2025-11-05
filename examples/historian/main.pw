@@ -8,7 +8,7 @@ skill rewriting_git_branch(changeset_description) {
     var session_id = "historian-${timestamp}"
     var work_dir = "/tmp/${session_id}"
 
-    mkdir -p work_dir
+    $ mkdir -p work_dir
 
     var current_branch = $(git rev_parse --abbrev_ref HEAD)
 
@@ -19,8 +19,8 @@ skill rewriting_git_branch(changeset_description) {
         work_dir
     }) > "${work_dir}/state.json"
 
-    echo "Created session: ${session_id}"
-    echo "Work directory: ${work_dir}"
+    $ echo "Created session: ${session_id}"
+    $ echo "Work directory: ${work_dir}"
 
     await task analyst(session_id, work_dir, changeset_description),
                narrator(session_id, work_dir),

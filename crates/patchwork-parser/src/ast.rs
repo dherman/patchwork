@@ -317,6 +317,8 @@ pub struct PromptBlock<'input> {
 pub enum PromptItem<'input> {
     /// Raw prompt text
     Text(&'input str),
+    /// Variable or expression interpolation: `$var` or `${expr}`
+    Interpolation(Expr<'input>),
     /// Embedded code block: `do { ... }`
     Code(Block<'input>),
 }

@@ -49,7 +49,7 @@ task scribe(session_id, work_dir) {
                 for var i in 1...3 {
                     log(session_id, "SCRIBE", "Running build validation (attempt ${i})")
 
-                    eval "${build_command}" 2>&1 | tee "${work_dir}/build-output.log"
+                    $ eval "${build_command}" 2>&1 | tee "${work_dir}/build-output.log"
                     if $? = 0 {
                         log(session_id, "SCRIBE", "Build passed on attempt ${i}")
                         break
@@ -74,7 +74,7 @@ task scribe(session_id, work_dir) {
 
                         think { Apply ${suggestion} }
 
-                        eval ${build_command} 2>&1 | tee "${work_dir}/build-output.log"
+                        $ eval ${build_command} 2>&1 | tee "${work_dir}/build-output.log"
                         if $? != 0 {
                             log(session_id, "SCRIBE", "User suggestion failed to fix build")
                             narrator.send({
@@ -100,10 +100,10 @@ task scribe(session_id, work_dir) {
             - Use `git apply` with extracted diff hunks
             - Then commit:
             {
-                git commit -m "${description}
-
-                🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
+                $ git commit -m "${description}                                 \
+                                                                                \
+                🤖 Generated with [Claude Code](https://claude.com/claude-code) \
+                                                                                \
                 Co-Authored-By: Claude <noreply@anthropic.com>"
 
                 var hash = $(git rev-parse HEAD)

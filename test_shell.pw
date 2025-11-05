@@ -1,0 +1,20 @@
+# Test shell mode parsing
+
+# Shell statement
+$ mkdir -p work_dir
+
+# Shell statement with flags
+$ git diff_index --quiet HEAD --
+
+# Command substitution (returns stdout)
+var branch = $(git rev_parse --abbrev_ref HEAD)
+
+# Shell expression in conditional (returns exit code)
+if ($ git diff_index --quiet HEAD --) {
+    echo "Clean"
+}
+
+# Negated shell expression
+if !($ git diff_index --quiet HEAD --) {
+    echo "Dirty"
+}

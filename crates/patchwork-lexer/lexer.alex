@@ -47,8 +47,8 @@ Gte: <Code> >=
 AndAnd: <Code> &&
 OrOr: <Code> \|\|
 
-LBrace: <Code,Prompt> \{
-RBrace: <Code,Prompt> \}
+LBrace: <Code,Prompt,Shell> \{
+RBrace: <Code,Prompt,Shell> \}
 LParen: <Code,Prompt,Shell> \(
 RParen: <Code,Prompt,Shell> \)
 LBracket: <Code> \[
@@ -91,6 +91,6 @@ ShellPipe: <Shell> \|
 ShellBackground: <Shell> &
 ShellAssign: <Shell> =
 ShellBackslash: <Shell> \\
-ShellArg: <Shell> [^\s\$\"\(\)<>|&=\\]+
+ShellArg: <Shell> [^\s\$\"\(\)<>|&=\\{}]+
 
 ErrorAny: <*> .
