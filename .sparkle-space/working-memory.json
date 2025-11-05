@@ -1,45 +1,40 @@
 {
-  "currentFocus": "M10 Task 7 Complete - narrator.pw parses successfully! 95/97 tests passing",
+  "currentFocus": "Investigated analyst.pw lexer issues - documented all workarounds",
   "recentAchievements": [
-    "Added tests for narrator.pw and scribe.pw parsing",
-    "Fixed multi-line object patterns and literals (newline support)",
-    "Implemented ObjectKey helper - keywords allowed as object keys and field names",
-    "Added type declarations as statements (not just top-level items)",
-    "Implemented postfix increment/decrement operators (++, --)",
-    "Fixed lexer: removed { } from Shell mode, now part of ShellArg",
-    "Added special shell variable support: $? for exit codes",
-    "Fixed scribe.pw: changed // comments to # style",
-    "Fixed scribe.pw: added space in 'while (true)' to avoid lexer ambiguity",
-    "narrator.pw now parses completely! Test passing",
-    "95 parser tests passing (was 94), zero conflicts maintained"
+    "Added defensive span checking to adapter - reveals which tokens have invalid spans",
+    "Identified root cause of analyst.pw failure: TWO distinct lexer bugs",
+    "Workaround #1: Skip tokens with invalid spans (Newline with end < start)",
+    "Documented analyst.pw issue #1: Invalid span tracking in Prompt mode with interpolation",
+    "Documented analyst.pw issue #2: Code fences contain {} treated as tokens not text",
+    "Created comprehensive parser-workarounds.md documenting ALL workarounds",
+    "Tracked 4 active workarounds and 2 known issues without workarounds",
+    "Updated test comments with detailed issue descriptions"
   ],
   "nextSteps": [
-    "Fix scribe.pw multi-line prompt mode issue (lexer state management)",
-    "Optional: Fix span tracking in analyst.pw (edge case)",
-    "Optional: Implement AST validation helpers (Task 8)",
-    "Optional: Add error reporting tests (Task 9)",
-    "Consider: Address lexer keyword ambiguity (while( → IdentifierCall)",
-    "Consider: What's next? Semantic analysis? Interpreter? Type checking?"
+    "Commit workaround documentation and findings",
+    "Decide: Fix remaining lexer issues OR move to next phase",
+    "Priority fixes: Prompt mode span tracking, multi-line ask blocks",
+    "Consider: Lexer redesign vs targeted fixes",
+    "Alternative: Move to semantic analysis/interpreter with current parser"
   ],
-  "collaborativeState": "Excellent progress! narrator.pw fully working. Added many parser features to support real-world historian examples: keywords as keys, type decls in blocks, ++/--, $?, multi-line objects. Only 2 files with issues remaining (scribe prompt mode, analyst span tracking).",
+  "collaborativeState": "Great catch on tracking workarounds! Created comprehensive documentation of all 4 active workarounds and 2 unfixed issues. Now we have full visibility into what we're masking vs what we've properly fixed.",
   "keyInsights": [
-    "Real-world files revealed missing features: keywords as keys, type decls in blocks, ++/--",
-    "Shell mode braces issue: {tree} in HEAD^{tree} needs to be part of ShellArg, not separate token",
-    "Lexer keyword ambiguity: while( matches IdentifierCall before while keyword - longest match wins",
-    "Multi-line object support critical: patterns, literals, and type annotations all need newlines",
-    "Special shell variables like $? need explicit grammar support",
-    "Comment style matters: // not supported, only # style",
-    "Member access should allow keywords as field names (instruction.type)",
-    "Three of four historian files now parse! Main, narrator working. Scribe/analyst have minor issues"
+    "Workarounds need explicit tracking - easy to forget what's masked",
+    "analyst.pw has TWO distinct issues: span tracking + code fence parsing",
+    "Span tracking bug: Newline token has start=2781, end=2774 (backwards!)",
+    "Code fence issue: PromptText pattern [^{}\\s\\$]+ excludes braces, breaks code examples",
+    "Lexer keyword ambiguity affects code style (while( vs while )",
+    "4 workarounds active, 2 issues have no workarounds (require lexer fixes)",
+    "parser-workarounds.md now documents: issue, workaround, root cause, proper fix, impact",
+    "Documentation enables informed decisions: fix now vs move forward vs redesign"
   ],
   "criticalAwareness": [
-    "Parser is 95% complete for historian examples (95/97 tests passing)",
-    "narrator.pw: 109 lines, full features, parses completely ✅",
-    "scribe.pw: multi-line ask blocks have lexer mode issue 🟡",
-    "analyst.pw: span tracking in prompt interpolation 🟡",
-    "Zero lalrpop conflicts maintained throughout all changes",
-    "Next phase: Either fix remaining issues OR move to semantic analysis/interpreter",
-    "Lexer improvements needed: keyword disambiguation, prompt mode state management",
-    "The parser handles complex real-world code - ready for next phase!"
+    "95/97 tests passing BUT 4 workarounds are masking issues",
+    "Active workarounds: invalid span skip, defensive checks, file edits, comment style",
+    "Two files blocked by lexer: analyst.pw (code fences), scribe.pw (multi-line prompts)",
+    "Lexer mode handling is the core issue - state management through transitions",
+    "Trade-off: Perfect lexer vs move forward with good-enough parser",
+    "All workarounds are documented with proper fix recommendations",
+    "Can make informed decision: targeted fixes vs lexer rewrite vs proceed as-is"
   ]
 }

@@ -687,7 +687,11 @@ This document breaks down the implementation of the patchwork parser into concre
   - Braces in shell arguments: `HEAD^{tree}` works correctly
   - Multi-line object literals and destructuring patterns
 - **Edge cases remaining:**
-  - analyst.pw has span tracking issues in prompt mode (test ignored)
+  - analyst.pw has TWO lexer issues in prompt mode (test ignored):
+    1. Invalid span tracking with string interpolation (Newline token has end < start)
+    2. Code fences (```javascript) contain `{` `}` that lexer treats as tokens instead of text
+       - PromptText pattern `[^{}\s\$]+` excludes braces
+       - Fix: Allow braces in PromptText or implement fence-aware lexing
   - scribe.pw has multi-line prompt mode issues (lexer state management)
   - AST validation helpers not implemented (task 8)
   - Error reporting not tested (task 9)

@@ -2810,13 +2810,15 @@ task test() {
     }
 
     #[test]
-    #[ignore] // TODO: Fix span tracking issues with mode switching
+    #[ignore] // TODO: Fix lexer issues with prompt mode
     fn test_parse_historian_analyst() {
         let input = include_str!("../../../examples/historian/analyst.pw");
         let result = parse(input);
 
-        // Milestone 10 - shell mode parsing mostly works, but span tracking has issues
-        // with certain interpolation patterns in prompt mode
+        // Milestone 10 - Two lexer issues prevent analyst.pw from parsing:
+        // 1. Invalid span tracking in Prompt mode with string interpolation (Newline token)
+        // 2. Code fences (```javascript) in prompts contain { } which lexer treats as tokens
+        //    PromptText pattern [^{}\s\$]+ excludes braces, but they should be allowed in prose
         assert!(result.is_ok(), "Failed to parse analyst.pw: {:?}", result);
     }
 

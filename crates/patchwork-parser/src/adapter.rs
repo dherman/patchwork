@@ -83,6 +83,10 @@ where
 
     /// Convert lexer Rule + span to ParserToken with &'input str references
     fn convert_token(&self, rule: Rule, start: usize, end: usize) -> ParserToken<'input> {
+        // Defensive check for invalid spans
+        if start > end {
+            panic!("Invalid token span for {:?}: start={} > end={}", rule, start, end);
+        }
         let text = &self.input[start..end];
 
         match rule {
@@ -200,6 +204,14 @@ where
                     // Convert line/column positions to byte offsets using cached line starts
                     let start = position_to_offset(self.input, &self.line_starts, span.start.line, span.start.column);
                     let end = position_to_offset(self.input, &self.line_starts, span.end.line, span.end.column);
+
+                    // Workaround for lexer span tracking bug in prompt mode with interpolation
+                    // If we get an invalid span, skip this token and try the next one
+                    if start > end {
+                        eprintln!("Warning: Skipping token {:?} with invalid span {}..{}", token.rule, start, end);
+                        continue;
+                    }
+
                     let parser_token = self.convert_token(token.rule, start, end);
                     return Some(Ok((start, parser_token, end)));
                 }
