@@ -38,9 +38,21 @@ var commit_plan = think {
 
 After multiple Prompt mode transitions, line 79 (containing 4 × `→` characters, 3 bytes each = 12 bytes but 4 columns) causes Newline token to have backwards span (start=2781, end=2774).
 
-**Technical Details:** The `→` character (U+2192) is 3 bytes in UTF-8 (bytes: `e2 86 92`). Line 79 has 4 of these, adding 12 bytes but only 4 to the column count. The lexer's position tracking uses column-based positions but span start/end are byte offsets. After mode transitions, the conversion between column positions and byte offsets gets corrupted when multi-byte characters are present. The position accumulator goes negative, producing backwards spans.
+**Technical Details:** The `→` character (U+2192) is 3 bytes in UTF-8 (bytes: `e2 86 92`). Line 79 has 4 of these, adding 12 bytes but only 4 to the column count.
 
-**Proper Fix:** Fix parlex's UTF-8 position tracking during mode transitions. The issue is in how `lexer.span()` converts between line/column positions and byte offsets when mode transitions occur. This is likely a parlex framework bug rather than our lexer code. Options:
+**Root Cause Confirmed:** Parlex framework UTF-8 bug verified via API investigation:
+- Parlex `Position.column` documented as "character position in the line"
+- Parlex `LexerCursor` documented as advancing "one byte at a time"
+- **Bug**: `LexerCursor` increments column by bytes instead of UTF-8 characters
+- Multi-byte character `→` (3 bytes) incorrectly increments column by 3 instead of 1
+- After many mode transitions, accumulated error causes `column > actual line length`
+- Example: reports column 96 on 80-character line
+- Our `position_to_offset()` correctly uses `char_indices()` for UTF-8 conversion
+- Trying to find character 96 on 80-character line → walks past line end → backwards span
+
+**Our Usage Verified Correct:** Investigation of adapter code (lines 17-37) confirms proper UTF-8 handling. The conversion from (line, column) to byte offsets uses Rust's `char_indices()` iterator which correctly counts UTF-8 characters. The bug is entirely within parlex's `LexerCursor` column tracking.
+
+**Proper Fix:** Fix parlex's `LexerCursor` to count UTF-8 characters instead of bytes for column positions. Options:
 1. Patch parlex to fix UTF-8 byte offset tracking across mode changes
 2. Switch to a different lexer that handles UTF-8 correctly
 3. Work around by normalizing UTF-8 characters in input (unacceptable - loses user content)
