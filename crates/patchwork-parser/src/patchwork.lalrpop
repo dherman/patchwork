@@ -64,6 +64,8 @@ extern {
         ">=" => ParserToken::Gte,
         "&&" => ParserToken::AndAnd,
         "||" => ParserToken::OrOr,
+        "++" => ParserToken::PlusPlus,
+        "--" => ParserToken::MinusMinus,
 
         // Punctuation
         "{" => ParserToken::LBrace,
@@ -86,6 +88,7 @@ extern {
         "/" => ParserToken::Slash,
         "%" => ParserToken::Percent,
         "!" => ParserToken::Bang,
+        "?" => ParserToken::Question,
         "=" => ParserToken::Assign,
         "|" => ParserToken::Pipe,
         "&" => ParserToken::Ampersand,
@@ -126,6 +129,35 @@ extern {
 IdentifierOrCall: &'input str = {
     <identifier> => <>,
     <identifier_call> => <>,
+};
+
+// Helper: Accept identifier or keywords (for object keys and pattern fields)
+// JavaScript/TypeScript allow keywords as unquoted object keys
+ObjectKey: &'input str = {
+    <identifier> => <>,
+    "type" => "type",
+    "import" => "import",
+    "from" => "from",
+    "var" => "var",
+    "if" => "if",
+    "else" => "else",
+    "for" => "for",
+    "while" => "while",
+    "await" => "await",
+    "task" => "task",
+    "skill" => "skill",
+    "fun" => "fun",
+    "return" => "return",
+    "succeed" => "succeed",
+    "fail" => "fail",
+    "break" => "break",
+    "self" => "self",
+    "in" => "in",
+    "think" => "think",
+    "ask" => "ask",
+    "do" => "do",
+    "true" => "true",
+    "false" => "false",
 };
 
 // Program: top-level items (with optional newlines between them - similar to StatementList)
@@ -253,8 +285,9 @@ Statement: Statement<'input> = {
     <ForStmt>,
     <WhileStmt>,
 
-    // Variable declarations - handled explicitly with all variants
+    // Declarations - handled explicitly
     <VarDeclStmt>,
+    <TypeDeclStmt>,
 
     // Keywords that can't start expressions - unambiguous
     <ReturnStmt>,
@@ -279,6 +312,13 @@ VarDeclStmt: Statement<'input> = {
     // var pattern (no init)
     "var" <pattern:Pattern> => {
         Statement::VarDecl { pattern, init: None }
+    },
+};
+
+// Type declaration statement: type name = TypeExpr (Milestone 10)
+TypeDeclStmt: Statement<'input> = {
+    "type" <name:identifier> "=" <type_expr:TypeExpr> => {
+        Statement::TypeDecl { name, type_expr }
     },
 };
 
@@ -426,9 +466,9 @@ TypeFieldList: Vec<TypeField<'input>> = {
     },
 };
 
-// Type field: key: TypeExpr
+// Type field: key: TypeExpr (allows keywords as keys)
 TypeField: TypeField<'input> = {
-    <key:identifier> ":" <type_expr:TypeExpr> => TypeField {
+    <key:ObjectKey> ":" <type_expr:TypeExpr> => TypeField {
         key,
         type_expr,
         optional: false,  // For now, no optional fields
@@ -444,14 +484,14 @@ Pattern: Pattern<'input> = {
     "{" <fields:ObjectPatternFieldList> "}" => Pattern::Object(fields),
 };
 
-// Object pattern field list
+// Object pattern field list (allow newlines for formatting)
 ObjectPatternFieldList: Vec<ObjectPatternField<'input>> = {
-    // Empty (though not useful, we allow it)
-    => vec![],
-    // Single field
-    <head:ObjectPatternField> => vec![head],
-    // Multiple fields
-    <head:ObjectPatternField> <tail:("," <ObjectPatternField>)+> => {
+    // Empty object pattern (allow newlines)
+    newline* => vec![],
+    // Single field (with optional surrounding newlines)
+    newline* <head:ObjectPatternField> newline* => vec![head],
+    // Multiple fields (with newlines allowed around commas)
+    newline* <head:ObjectPatternField> <tail:(newline* "," newline* <ObjectPatternField>)+> newline* => {
         let mut fields = vec![head];
         fields.extend(tail);
         fields
@@ -461,13 +501,13 @@ ObjectPatternFieldList: Vec<ObjectPatternField<'input>> = {
 // Object pattern field: key, key: type, or key: nestedPattern
 ObjectPatternField: ObjectPatternField<'input> = {
     // Simple: {x} means extract x
-    <key:identifier> => ObjectPatternField {
+    <key:ObjectKey> => ObjectPatternField {
         key,
         pattern: Pattern::Identifier { name: key, type_ann: None },
         type_ann: None,
     },
-    // With type annotation: {x: string}
-    <key:identifier> ":" <type_ann:TypeExpr> => ObjectPatternField {
+    // With type annotation: {x: string} or {type: string}
+    <key:ObjectKey> ":" <type_ann:TypeExpr> => ObjectPatternField {
         key,
         pattern: Pattern::Identifier { name: key, type_ann: None },
         type_ann: Some(type_ann),
@@ -601,8 +641,8 @@ UnaryExpr: Expr<'input> = {
 // Postfix expressions: member access, call, index
 // These are left-associative and have the same precedence
 PostfixExpr: Expr<'input> = {
-    // Member access: obj.field
-    <object:PostfixExpr> "." <field:identifier> => Expr::Member {
+    // Member access: obj.field (allows keywords as field names)
+    <object:PostfixExpr> "." <field:ObjectKey> => Expr::Member {
         object: Box::new(object),
         field,
     },
@@ -630,6 +670,12 @@ PostfixExpr: Expr<'input> = {
         index: Box::new(index),
     },
 
+    // Postfix increment: x++
+    <operand:PostfixExpr> "++" => Expr::PostIncrement(Box::new(operand)),
+
+    // Postfix decrement: x--
+    <operand:PostfixExpr> "--" => Expr::PostDecrement(Box::new(operand)),
+
     // Primary expressions
     <PrimaryExpr>,
 };
@@ -643,6 +689,7 @@ PrimaryExpr: Expr<'input> = {
     "true" => Expr::True,
     "false" => Expr::False,
     "self" => Expr::Identifier("self"),
+    dollar "?" => Expr::Identifier("?"),  // Special shell variable: $?
 
     // Array literal: [1, 2, 3]
     "[" <elements:ExprList> "]" => Expr::Array(elements),
@@ -715,6 +762,12 @@ CommandArg: CommandArg<'input> = {
             parts: vec![StringPart::Interpolation(Box::new(Expr::Identifier(id)))]
         })
     },
+    dollar "?" => {
+        // Special shell variable: $? (exit code)
+        CommandArg::String(StringLiteral {
+            parts: vec![StringPart::Interpolation(Box::new(Expr::Identifier("?")))]
+        })
+    },
     dollar <arg:shell_arg> => {
         // Treat shell_arg after $ as an identifier for interpolation
         CommandArg::String(StringLiteral {
@@ -782,14 +835,14 @@ ExprList: Vec<Expr<'input>> = {
     },
 };
 
-// Object field list (for object literals)
+// Object field list (for object literals - allow newlines for formatting)
 ObjectFieldList: Vec<ObjectField<'input>> = {
-    // Empty object
-    => vec![],
-    // Single field
-    <head:ObjectField> => vec![head],
-    // Multiple fields
-    <head:ObjectField> <tail:("," <ObjectField>)+> => {
+    // Empty object (allow newlines)
+    newline* => vec![],
+    // Single field (with optional surrounding newlines)
+    newline* <head:ObjectField> newline* => vec![head],
+    // Multiple fields (with newlines allowed around commas)
+    newline* <head:ObjectField> <tail:(newline* "," newline* <ObjectField>)+> newline* => {
         let mut fields = vec![head];
         fields.extend(tail);
         fields
@@ -798,9 +851,9 @@ ObjectFieldList: Vec<ObjectField<'input>> = {
 
 // Object field: key: value or key (shorthand)
 ObjectField: ObjectField<'input> = {
-    // Full form: key: value
-    <key:identifier> ":" <value:Expr> => ObjectField { key, value: Some(value) },
-    // Shorthand form: key (means key: key)
+    // Full form: key: value (allows keywords as keys)
+    <key:ObjectKey> ":" <value:Expr> => ObjectField { key, value: Some(value) },
+    // Shorthand form: key (means key: key) - only identifiers allowed, not keywords
     <key:identifier> => ObjectField { key, value: None },
 };
 

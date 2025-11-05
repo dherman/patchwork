@@ -2820,6 +2820,20 @@ task test() {
         assert!(result.is_ok(), "Failed to parse analyst.pw: {:?}", result);
     }
 
+    #[test]
+    fn test_parse_historian_narrator() {
+        let input = include_str!("../../../examples/historian/narrator.pw");
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse narrator.pw: {:?}", result);
+    }
+
+    #[test]
+    fn test_parse_historian_scribe() {
+        let input = include_str!("../../../examples/historian/scribe.pw");
+        let result = parse(input);
+        assert!(result.is_ok(), "Failed to parse scribe.pw: {:?}", result);
+    }
+
     // Shell mode tests (Milestone 10)
     #[test]
     fn test_shell_statement() {

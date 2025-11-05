@@ -47,8 +47,8 @@ Gte: <Code> >=
 AndAnd: <Code> &&
 OrOr: <Code> \|\|
 
-LBrace: <Code,Prompt,Shell> \{
-RBrace: <Code,Prompt,Shell> \}
+LBrace: <Code,Prompt> \{
+RBrace: <Code,Prompt> \}
 LParen: <Code,Prompt,Shell> \(
 RParen: <Code,Prompt,Shell> \)
 LBracket: <Code> \[
@@ -62,12 +62,15 @@ Number: <Code> [0-9]+
 
 Lt: <Code> <
 Gt: <Code> >
+PlusPlus: <Code> \+\+
+MinusMinus: <Code> --
 Plus: <Code> \+
 Minus: <Code> -
 Star: <Code> \*
 Slash: <Code> /
 Percent: <Code> %
 Bang: <Code> !
+Question: <Code> \?
 Assign: <Code> =
 Pipe: <Code> \|
 Ampersand: <Code> &
@@ -91,6 +94,6 @@ ShellPipe: <Shell> \|
 ShellBackground: <Shell> &
 ShellAssign: <Shell> =
 ShellBackslash: <Shell> \\
-ShellArg: <Shell> [^\s\$\"\(\)<>|&=\\{}]+
+ShellArg: <Shell> [^\s\$\"\(\)<>|&=\\]+
 
 ErrorAny: <*> .

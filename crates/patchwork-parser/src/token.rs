@@ -54,6 +54,8 @@ pub enum ParserToken<'input> {
     Gte,
     AndAnd,
     OrOr,
+    PlusPlus,
+    MinusMinus,
 
     // Punctuation
     LBrace,
@@ -76,6 +78,7 @@ pub enum ParserToken<'input> {
     Slash,
     Percent,
     Bang,
+    Question,
     Assign,
     Pipe,
     Ampersand,

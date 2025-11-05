@@ -138,6 +138,11 @@ pub enum Statement<'input> {
     Fail,
     /// Break statement (for loops): `break`
     Break,
+    /// Type declaration: `type Foo = { ... }`
+    TypeDecl {
+        name: &'input str,
+        type_expr: TypeExpr<'input>,
+    },
 }
 
 /// Type expression (Milestone 8: complete type system)
@@ -274,6 +279,10 @@ pub enum Expr<'input> {
         object: Box<Expr<'input>>,
         index: Box<Expr<'input>>,
     },
+    /// Postfix increment: `x++`
+    PostIncrement(Box<Expr<'input>>),
+    /// Postfix decrement: `x--`
+    PostDecrement(Box<Expr<'input>>),
     /// Parenthesized expression: `(expr)`
     Paren(Box<Expr<'input>>),
     /// Await expression: `await task_call()`

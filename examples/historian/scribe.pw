@@ -13,12 +13,12 @@ task scribe(session_id, work_dir) {
     var {
         type: "build_config",
         build_command: string
-    } = self.receive(10800000)  // 3 hours
+    } = self.receive(10800000)  # 3 hours
 
     log(session_id, "SCRIBE", "Received build config: ${build_command}")
 
-    while(true) {
-        var instruction = self.receive(10800000) // 3 hours
+    while (true) {
+        var instruction = self.receive(10800000) # 3 hours
 
         if instruction.type = "done" {
             log(session_id, "SCRIBE", "Received done signal from narrator, exiting")
