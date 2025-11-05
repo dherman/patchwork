@@ -146,8 +146,13 @@ ImportPath: ImportPath<'input> = {
         names.extend(tail);
         ImportPath::RelativeMulti(names)
     },
-    // Simple dotted path: For now, just accept identifier sequences
-    // Will expand this in later milestones if needed
+    // Dotted path: std.log or foo.bar.baz
+    <head:identifier> <tail:("." <identifier>)+> => {
+        let mut parts = vec![head];
+        parts.extend(tail);
+        ImportPath::Simple(parts)
+    },
+    // Simple single identifier
     <id:identifier> => ImportPath::Simple(vec![id]),
 };
 
@@ -602,6 +607,33 @@ PrimaryExpr: Expr<'input> = {
 
     // Parenthesized expression
     "(" <e:Expr> ")" => Expr::Paren(Box::new(e)),
+
+    // Bare command: identifier followed by arguments (not identifier_call)
+    // Example: mkdir -p work_dir
+    <name:identifier> <args:CommandArgs> => Expr::BareCommand { name, args },
+};
+
+// Command arguments - one or more arguments for bare commands
+// Continues until hitting a statement terminator or shell operator
+CommandArgs: Vec<CommandArg<'input>> = {
+    <head:CommandArg> <tail:CommandArg*> => {
+        let mut args = vec![head];
+        args.extend(tail);
+        args
+    },
+};
+
+// Single command argument - can be a literal token or a string
+CommandArg: CommandArg<'input> = {
+    // String argument with interpolation: "${work_dir}"
+    <s:StringLiteral> => CommandArg::String(s),
+
+    // Literal arguments: identifiers and numbers
+    <id:identifier> => CommandArg::Literal(id),
+    <num:number> => CommandArg::Literal(num),
+
+    // TODO M10: Handle complex patterns like -p, +%Y, ..
+    // For now, these will need to be in strings or we need lexer support
 };
 
 // String literal with interpolation support
