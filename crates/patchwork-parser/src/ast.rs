@@ -3,8 +3,6 @@
 /// These types represent the parsed structure of patchwork programs.
 /// All types carry a lifetime 'input for zero-copy string slices.
 
-use std::marker::PhantomData;
-
 /// A complete patchwork program
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program<'input> {
@@ -287,7 +285,7 @@ pub enum Expr<'input> {
     Paren(Box<Expr<'input>>),
     /// Await expression: `await task_call()`
     Await(Box<Expr<'input>>),
-    /// Task parallel execution: `task expr1, expr2, expr3`
+    /// Task parallel execution: `task (expr1, expr2, expr3)`
     /// Semantically like Promise.race() - invokes tasks in parallel
     Task(Vec<Expr<'input>>),
     /// Think expression: `think { ... }`
@@ -306,8 +304,6 @@ pub enum Expr<'input> {
         name: &'input str,
         args: Vec<CommandArg<'input>>,
     },
-    /// Placeholder for unparsed expressions (temporary for incremental implementation)
-    Placeholder(PhantomData<&'input ()>),
 }
 
 /// Object field in an object literal

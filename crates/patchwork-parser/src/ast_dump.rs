@@ -297,9 +297,6 @@ fn write_expr(out: &mut String, expr: &Expr, indent: usize) -> std::fmt::Result 
             writeln!(out, "{}Do:", prefix)?;
             write_block(out, block, indent + 1)?;
         }
-        Expr::Placeholder(_) => {
-            writeln!(out, "{}Placeholder", prefix)?;
-        }
     }
     Ok(())
 }
