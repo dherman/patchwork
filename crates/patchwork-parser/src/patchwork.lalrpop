@@ -501,7 +501,11 @@ ObjectPatternField: ObjectPatternField<'input> = {
 
 // Expression with precedence (Milestone 4)
 // Manual precedence climbing approach for clarity
-Expr: Expr<'input> = { AssignExpr };
+// Top-level expression - includes task operator (lowest precedence)
+Expr: Expr<'input> = { TaskExpr };
+
+// Task operator: removed - using call syntax instead
+TaskExpr: Expr<'input> = { AssignExpr };
 
 // Assignment (right-associative)
 AssignExpr: Expr<'input> = {
@@ -712,6 +716,10 @@ PrimaryExpr: Expr<'input> = {
 
     // Parenthesized expression
     "(" <e:Expr> ")" => Expr::Paren(Box::new(e)),
+
+    // Task operator: task(expr1, expr2, expr3)
+    // Like function call syntax but keyword instead of identifier
+    "task" "(" <tasks:ExprList> ")" => Expr::Task(tasks),
 };
 
 // Command arguments - one or more arguments for bare commands
@@ -797,13 +805,14 @@ StringPart: StringPart<'input> = {
 };
 
 // Expression list (for function arguments and array literals)
+// Allows optional newlines for formatting multi-line argument lists
 ExprList: Vec<Expr<'input>> = {
-    // Empty list
-    => vec![],
-    // Single expr
-    <head:Expr> => vec![head],
-    // Multiple exprs
-    <head:Expr> <tail:("," <Expr>)+> => {
+    // Empty list (allow newlines)
+    newline* => vec![],
+    // Single expr (with optional surrounding newlines)
+    newline* <head:Expr> newline* => vec![head],
+    // Multiple exprs (with newlines allowed around commas)
+    newline* <head:Expr> <tail:(newline* "," newline* <Expr>)+> newline* => {
         let mut exprs = vec![head];
         exprs.extend(tail);
         exprs

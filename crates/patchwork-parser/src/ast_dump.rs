@@ -257,6 +257,12 @@ fn write_expr(out: &mut String, expr: &Expr, indent: usize) -> std::fmt::Result 
             writeln!(out, "{}Await:", prefix)?;
             write_expr(out, e, indent + 1)?;
         }
+        Expr::Task(tasks) => {
+            writeln!(out, "{}Task:", prefix)?;
+            for task in tasks {
+                write_expr(out, task, indent + 1)?;
+            }
+        }
         Expr::BareCommand { name, args } => {
             writeln!(out, "{}BareCommand: {}", prefix, name)?;
             if !args.is_empty() {

@@ -287,6 +287,9 @@ pub enum Expr<'input> {
     Paren(Box<Expr<'input>>),
     /// Await expression: `await task_call()`
     Await(Box<Expr<'input>>),
+    /// Task parallel execution: `task expr1, expr2, expr3`
+    /// Semantically like Promise.race() - invokes tasks in parallel
+    Task(Vec<Expr<'input>>),
     /// Think expression: `think { ... }`
     Think(PromptBlock<'input>),
     /// Ask expression: `ask { ... }`

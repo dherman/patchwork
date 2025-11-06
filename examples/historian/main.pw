@@ -22,7 +22,7 @@ skill rewriting_git_branch(changeset_description) {
     $ echo "Created session: ${session_id}"
     $ echo "Work directory: ${work_dir}"
 
-    await task analyst(session_id, work_dir, changeset_description),
+    await task(analyst(session_id, work_dir, changeset_description),
                narrator(session_id, work_dir),
-               scribe(session_id, work_dir)
+               scribe(session_id, work_dir))
 }
