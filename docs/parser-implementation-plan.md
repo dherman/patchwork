@@ -652,9 +652,15 @@ This document breaks down the implementation of the patchwork parser into concre
    - [x] `examples/historian/analyst.pw` parses completely ✅ (test_parse_historian_analyst)
    - [x] `examples/historian/scribe.pw` parses completely ✅ **NOW PASSING!** (test_parse_historian_scribe)
 
-8. **Validate AST structure**
-   - [ ] Write test helper to dump AST
-   - [ ] Verify key structures from historian examples
+8. **Validate AST structure** ✅
+   - [x] Write test helper to dump AST (ast_dump.rs module)
+   - [x] Verify key structures from historian examples
+     - test_validate_historian_main_ast (simplified version)
+     - test_validate_analyst_think_ask_pattern
+     - test_validate_command_substitution_structure
+     - test_validate_bare_command_structure
+     - test_validate_string_interpolation_structure
+     - test_dump_historian_main_ast (dumps analyst.pw AST)
 
 9. **Error reporting**
    - [ ] Test invalid command syntax
@@ -691,8 +697,18 @@ This document breaks down the implementation of the patchwork parser into concre
   - ~~analyst.pw code fences~~ ✅ **FIXED** - Implemented balanced braces with recursive grammar
   - ~~Lexer keyword ambiguity~~ ✅ **FIXED** - Eliminated IdentifierCall token, require `$` prefix for shell commands
   - ~~scribe.pw multi-line ask blocks~~ ✅ **FIXED** - Three fixes: standalone `do` handling, StringText backslash support, Shell mode in prompts
+- **Step 8 - AST Validation (COMPLETE):** ✅
+  - Created `ast_dump.rs` module with pretty-printing visitor
+  - Dumps AST as hierarchical tree structure
+  - Added 6 validation tests checking AST structure:
+    - Import declarations (RelativeMulti paths)
+    - Skill/Task declarations with parameters
+    - Variable declarations with command substitution
+    - Think || Ask patterns in prompts
+    - Bare command structure (name + args)
+    - String interpolation parts (text + interpolation)
+  - All tests passing (109 total parser tests)
 - **Optional enhancements:**
-  - AST validation helpers not implemented (task 8) - optional
   - Error reporting not tested (task 9) - optional
 - See [parser-design.md](parser-design.md#bare-command-expressions) for complete design rationale
 

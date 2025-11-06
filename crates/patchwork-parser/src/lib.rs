@@ -1,6 +1,8 @@
 pub mod token;
 pub mod adapter;
 pub mod ast;
+#[cfg(test)]
+pub mod ast_dump;
 
 // Include generated parser code from lalrpop
 #[allow(clippy::all)]
@@ -2830,6 +2832,254 @@ skill rewriting_git_branch(changeset_description) {
         let input = include_str!("../../../examples/historian/scribe.pw");
         let result = parse(input);
         assert!(result.is_ok(), "Failed to parse scribe.pw: {:?}", result);
+    }
+
+    // ===== AST Structure Validation Tests (M10 Step 8) =====
+
+    #[test]
+    fn test_validate_historian_main_ast() {
+        // Validate the AST structure of a simplified main.pw
+        // Note: Full main.pw requires "await task ..." syntax not yet implemented
+        let input = r#"
+import ./{analyst, narrator, scribe}
+
+skill rewriting_git_branch(changeset_description) {
+    var timestamp = $(date +%Y%m%d-%H%M%S)
+    var session_id = "historian-${timestamp}"
+    var work_dir = "/tmp/${session_id}"
+
+    $ mkdir -p work_dir
+
+    var current_branch = $(git rev_parse --abbrev_ref HEAD)
+
+    $ echo "Created session: ${session_id}"
+    $ echo "Work directory: ${work_dir}"
+}
+        "#;
+        let program = parse(input).expect("Should parse simplified main.pw");
+
+        // Should have 2 items: import and skill
+        assert_eq!(program.items.len(), 2, "Expected import + skill");
+
+        // First item: import ./{analyst, narrator, scribe}
+        match &program.items[0] {
+            Item::Import(decl) => {
+                match &decl.path {
+                    ImportPath::RelativeMulti(names) => {
+                        assert_eq!(names.len(), 3);
+                        assert_eq!(names[0], "analyst");
+                        assert_eq!(names[1], "narrator");
+                        assert_eq!(names[2], "scribe");
+                    }
+                    _ => panic!("Expected RelativeMulti import"),
+                }
+            }
+            _ => panic!("Expected Import as first item"),
+        }
+
+        // Second item: skill rewriting_git_branch(changeset_description)
+        match &program.items[1] {
+            Item::Skill(skill) => {
+                assert_eq!(skill.name, "rewriting_git_branch");
+                assert_eq!(skill.params.len(), 1);
+                assert_eq!(skill.params[0].name, "changeset_description");
+
+                // Should have several statements
+                assert!(skill.body.statements.len() > 5,
+                    "Expected multiple statements in skill body");
+
+                // First three should be var declarations with command substitution
+                for i in 0..3 {
+                    match &skill.body.statements[i] {
+                        Statement::VarDecl { pattern, init } => {
+                            match pattern {
+                                Pattern::Identifier { name, .. } => {
+                                    match i {
+                                        0 => assert_eq!(*name, "timestamp"),
+                                        1 => assert_eq!(*name, "session_id"),
+                                        2 => assert_eq!(*name, "work_dir"),
+                                        _ => {}
+                                    }
+                                }
+                                _ => panic!("Expected identifier pattern"),
+                            }
+                            assert!(init.is_some(), "Expected initialization");
+                        }
+                        _ => panic!("Expected var decl at position {}", i),
+                    }
+                }
+            }
+            _ => panic!("Expected Skill as second item"),
+        }
+    }
+
+    #[test]
+    fn test_validate_analyst_think_ask_pattern() {
+        // Validate that analyst.pw has think || ask pattern
+        let input = include_str!("../../../examples/historian/analyst.pw");
+        let program = parse(input).expect("Should parse analyst.pw");
+
+        // Should have 2 items: import and task
+        assert_eq!(program.items.len(), 2);
+
+        match &program.items[1] {
+            Item::Task(task) => {
+                assert_eq!(task.name, "analyst");
+
+                // Find a var decl that has think || ask pattern
+                let mut found_think_ask = false;
+                for stmt in &task.body.statements {
+                    if let Statement::VarDecl { init: Some(expr), .. } = stmt {
+                        // Check if it's a Binary OR with Think on left
+                        if let Expr::Binary { op: BinOp::Or, left, right } = expr {
+                            if matches!(&**left, Expr::Think(_)) && matches!(&**right, Expr::Ask(_)) {
+                                found_think_ask = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                assert!(found_think_ask, "Should find think {{ ... }} || ask {{ ... }} pattern");
+            }
+            _ => panic!("Expected Task"),
+        }
+    }
+
+    #[test]
+    fn test_validate_command_substitution_structure() {
+        // Validate command substitution creates correct AST
+        let input = "task test() { var x = $(date +%s) }";
+        let program = parse(input).expect("Should parse");
+
+        match &program.items[0] {
+            Item::Task(task) => {
+                match &task.body.statements[0] {
+                    Statement::VarDecl { pattern, init } => {
+                        match pattern {
+                            Pattern::Identifier { name, .. } => {
+                                assert_eq!(*name, "x");
+                            }
+                            _ => panic!("Expected identifier pattern"),
+                        }
+
+                        // Init should be CommandSubst
+                        match init.as_ref().unwrap() {
+                            Expr::CommandSubst { name, args } => {
+                                assert_eq!(*name, "date");
+                                assert_eq!(args.len(), 1);
+                                match &args[0] {
+                                    CommandArg::Literal(s) => {
+                                        assert_eq!(*s, "+%s");
+                                    }
+                                    _ => panic!("Expected literal arg"),
+                                }
+                            }
+                            _ => panic!("Expected CommandSubst expression"),
+                        }
+                    }
+                    _ => panic!("Expected var decl"),
+                }
+            }
+            _ => panic!("Expected task"),
+        }
+    }
+
+    #[test]
+    fn test_validate_bare_command_structure() {
+        // Validate bare command creates correct AST
+        let input = "task test() {\n    $ mkdir -p work_dir\n}";
+        let program = parse(input).expect("Should parse");
+
+        match &program.items[0] {
+            Item::Task(task) => {
+                match &task.body.statements[0] {
+                    Statement::Expr(Expr::BareCommand { name, args }) => {
+                        assert_eq!(*name, "mkdir");
+                        assert_eq!(args.len(), 2);
+
+                        match &args[0] {
+                            CommandArg::Literal(s) => assert_eq!(*s, "-p"),
+                            _ => panic!("Expected literal arg"),
+                        }
+
+                        match &args[1] {
+                            CommandArg::Literal(s) => assert_eq!(*s, "work_dir"),
+                            _ => panic!("Expected literal arg"),
+                        }
+                    }
+                    _ => panic!("Expected BareCommand expression statement"),
+                }
+            }
+            _ => panic!("Expected task"),
+        }
+    }
+
+    #[test]
+    fn test_validate_string_interpolation_structure() {
+        // Validate string interpolation creates correct AST parts
+        let input = r#"task test() { var x = "session-${timestamp}" }"#;
+        let program = parse(input).expect("Should parse");
+
+        match &program.items[0] {
+            Item::Task(task) => {
+                match &task.body.statements[0] {
+                    Statement::VarDecl { init: Some(expr), .. } => {
+                        match expr {
+                            Expr::String(lit) => {
+                                // Should have 2 parts: text + interpolation
+                                assert_eq!(lit.parts.len(), 2);
+
+                                match &lit.parts[0] {
+                                    StringPart::Text(t) => {
+                                        assert_eq!(*t, "session-");
+                                    }
+                                    _ => panic!("Expected text part"),
+                                }
+
+                                match &lit.parts[1] {
+                                    StringPart::Interpolation(expr) => {
+                                        match &**expr {
+                                            Expr::Identifier(name) => {
+                                                assert_eq!(*name, "timestamp");
+                                            }
+                                            _ => panic!("Expected identifier in interpolation"),
+                                        }
+                                    }
+                                    _ => panic!("Expected interpolation part"),
+                                }
+                            }
+                            _ => panic!("Expected string expression"),
+                        }
+                    }
+                    _ => panic!("Expected var decl"),
+                }
+            }
+            _ => panic!("Expected task"),
+        }
+    }
+
+    #[test]
+    fn test_dump_historian_main_ast() {
+        // Test AST dumping on simplified main.pw-style code
+        use crate::ast_dump::dump_program;
+
+        // Use analyst.pw which fully parses
+        let input = include_str!("../../../examples/historian/analyst.pw");
+        let program = parse(input).expect("Should parse analyst.pw");
+
+        let dump = dump_program(&program);
+
+        // Verify dump contains key structural elements from analyst.pw
+        assert!(dump.contains("Program:"));
+        assert!(dump.contains("Import:"));
+        assert!(dump.contains("Task: analyst"));
+        assert!(dump.contains("VarDecl:"));
+        assert!(dump.contains("If:"));
+        assert!(dump.contains("Think:"));
+        assert!(dump.contains("Ask:"));
+
+        // Print dump for manual inspection during test runs with --nocapture
+        println!("\n=== Historian analyst.pw AST (first 500 chars) ===\n{}", &dump[..dump.len().min(500)]);
     }
 
     // Shell mode tests (Milestone 10)
