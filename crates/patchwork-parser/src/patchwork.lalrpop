@@ -868,10 +868,36 @@ DoExpr: Expr<'input> = {
 // We collect them all, and newlines are allowed anywhere
 PromptBlock: PromptBlock<'input> = {
     <items:(PromptItemOrNewline)*> => {
-        // Filter out None (newlines) and collect the actual items
-        PromptBlock {
-            items: items.into_iter().filter_map(|x| x).collect()
+        // Filter out None (newlines) and merge adjacent Text nodes
+        let filtered: Vec<PromptItem> = items.into_iter().filter_map(|x| x).collect();
+        let mut merged = Vec::new();
+        let mut text_acc: Vec<&str> = Vec::new();
+
+        for item in filtered {
+            match item {
+                PromptItem::Text(t) => {
+                    // Accumulate text nodes
+                    text_acc.push(t);
+                },
+                other => {
+                    // Flush accumulated text if any
+                    if !text_acc.is_empty() {
+                        let combined = text_acc.join(" ");
+                        merged.push(PromptItem::Text(combined.leak()));
+                        text_acc.clear();
+                    }
+                    merged.push(other);
+                }
+            }
         }
+
+        // Flush any remaining accumulated text
+        if !text_acc.is_empty() {
+            let combined = text_acc.join(" ");
+            merged.push(PromptItem::Text(combined.leak()));
+        }
+
+        PromptBlock { items: merged }
     },
 };
 

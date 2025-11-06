@@ -1373,6 +1373,69 @@ mod tests {
         assert_eq!(program.items.len(), 1);
     }
 
+    #[test]
+    fn test_adjacent_text_nodes_merged() {
+        // Test that adjacent text nodes in prompt blocks are merged into single Text node
+        let input = r#"
+            task example() {
+                var result = think {
+                    This is a multi-word sentence
+                    with $variable interpolation and
+                    more text after
+                }
+            }
+        "#;
+        let program = parse(input).expect("Should parse");
+
+        // Extract the prompt block from: program -> task -> var decl -> think expr
+        match &program.items[0] {
+            Item::Task(task) => {
+                match &task.body.statements[0] {
+                    Statement::VarDecl { init, .. } => {
+                        match init.as_ref().unwrap() {
+                            Expr::Think(prompt) => {
+                                // Should have exactly 3 items:
+                                // 1. Text("This is a multi-word sentence with")
+                                // 2. Interpolation($variable)
+                                // 3. Text("interpolation and more text after")
+                                assert_eq!(prompt.items.len(), 3,
+                                    "Expected 3 items (text, interpolation, text), got {}",
+                                    prompt.items.len());
+
+                                // Verify first item is merged text
+                                match &prompt.items[0] {
+                                    PromptItem::Text(t) => {
+                                        assert!(t.contains("This is a multi-word sentence"));
+                                        assert!(t.contains("with"));
+                                    }
+                                    _ => panic!("Expected first item to be Text"),
+                                }
+
+                                // Verify second item is interpolation
+                                match &prompt.items[1] {
+                                    PromptItem::Interpolation(Expr::Identifier("variable")) => {},
+                                    _ => panic!("Expected second item to be Interpolation($variable)"),
+                                }
+
+                                // Verify third item is merged text
+                                match &prompt.items[2] {
+                                    PromptItem::Text(t) => {
+                                        assert!(t.contains("interpolation and"));
+                                        assert!(t.contains("more text after"));
+                                    }
+                                    _ => panic!("Expected third item to be Text"),
+                                }
+                            }
+                            _ => panic!("Expected Think expression"),
+                        }
+                    }
+                    _ => panic!("Expected var decl"),
+                }
+            }
+            _ => panic!("Expected task"),
+        }
+    }
+
     // ===== String Interpolation Tests (Milestone 6) =====
 
     #[test]
