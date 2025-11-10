@@ -40,6 +40,7 @@ pub enum ParserToken<'input> {
     Break,
     SelfKw,
     In,
+    Underscore,
 
     // Literals
     True,

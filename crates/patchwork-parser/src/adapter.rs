@@ -122,6 +122,7 @@ where
             Rule::Break => ParserToken::Break,
             Rule::SelfKw => ParserToken::SelfKw,
             Rule::In => ParserToken::In,
+            Rule::Underscore => ParserToken::Underscore,
             Rule::True => ParserToken::True,
             Rule::False => ParserToken::False,
             Rule::Number => ParserToken::Number(text),

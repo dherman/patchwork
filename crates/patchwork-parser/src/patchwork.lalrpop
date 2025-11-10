@@ -50,6 +50,7 @@ extern {
         "break" => ParserToken::Break,
         "self" => ParserToken::SelfKw,
         "in" => ParserToken::In,
+        "_" => ParserToken::Underscore,
 
         // Literals
         "true" => ParserToken::True,
@@ -465,11 +466,31 @@ TypeField: TypeField<'input> = {
 
 // Pattern for variable declarations (Milestone 7)
 Pattern: Pattern<'input> = {
+    // Ignore pattern: var _ = ...
+    "_" => Pattern::Ignore,
+
     // Simple identifier with optional type: var x: type = ...
     <name:identifier> <type_ann:(":" <TypeExpr>)?> => Pattern::Identifier { name, type_ann },
 
     // Object destructuring pattern: var {x, y} = ...
     "{" <fields:ObjectPatternFieldList> "}" => Pattern::Object(fields),
+
+    // Tuple destructuring pattern: var (x, y, z) = ...
+    "(" <patterns:PatternList> ")" => Pattern::Tuple(patterns),
+};
+
+// Pattern list for tuple destructuring (comma-separated patterns)
+PatternList: Vec<Pattern<'input>> = {
+    // Empty tuple (though uncommon)
+    => vec![],
+    // Single pattern
+    <head:Pattern> => vec![head],
+    // Multiple patterns
+    <head:Pattern> <tail:("," <Pattern>)+> => {
+        let mut patterns = vec![head];
+        patterns.extend(tail);
+        patterns
+    },
 };
 
 // Object pattern field list (allow newlines for formatting)

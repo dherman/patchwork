@@ -102,8 +102,12 @@ pub enum Pattern<'input> {
         name: &'input str,
         type_ann: Option<TypeExpr<'input>>,
     },
+    /// Ignore pattern: `var _ = ...`
+    Ignore,
     /// Object destructuring pattern: `var {x, y} = ...`
     Object(Vec<ObjectPatternField<'input>>),
+    /// Tuple destructuring pattern: `var (x, y, z) = ...`
+    Tuple(Vec<Pattern<'input>>),
 }
 
 /// Field in an object destructuring pattern

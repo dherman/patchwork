@@ -186,6 +186,9 @@ fn write_pattern(out: &mut String, pattern: &Pattern, indent: usize) -> std::fmt
                 writeln!(out, "{}Pattern: {}", prefix, name)?;
             }
         }
+        Pattern::Ignore => {
+            writeln!(out, "{}Pattern: _", prefix)?;
+        }
         Pattern::Object(fields) => {
             writeln!(out, "{}ObjectPattern:", prefix)?;
             for field in fields {
@@ -195,6 +198,12 @@ fn write_pattern(out: &mut String, pattern: &Pattern, indent: usize) -> std::fmt
                     writeln!(out, "{}    Type:", prefix)?;
                     write_type_expr(out, ty, indent + 3)?;
                 }
+            }
+        }
+        Pattern::Tuple(patterns) => {
+            writeln!(out, "{}TuplePattern:", prefix)?;
+            for pattern in patterns {
+                write_pattern(out, pattern, indent + 1)?;
             }
         }
     }

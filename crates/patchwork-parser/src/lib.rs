@@ -3499,3 +3499,97 @@ mod debug_tests {
         }
     }
 }
+
+    #[test]
+    fn test_tuple_pattern_simple() {
+        let input = r#"
+            agent test() {
+                var (x, y, z) = triple()
+            }
+        "#;
+        let program = parse(input).expect("Should parse simple tuple pattern");
+
+        let func = match &program.items[0] {
+            Item::Agent(f) => f,
+            _ => panic!("Expected agent"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, init: _ } => {
+                match pattern {
+                    Pattern::Tuple(patterns) => {
+                        assert_eq!(patterns.len(), 3);
+                        match &patterns[0] {
+                            Pattern::Identifier { name, .. } => assert_eq!(*name, "x"),
+                            _ => panic!("Expected identifier pattern"),
+                        }
+                        match &patterns[1] {
+                            Pattern::Identifier { name, .. } => assert_eq!(*name, "y"),
+                            _ => panic!("Expected identifier pattern"),
+                        }
+                        match &patterns[2] {
+                            Pattern::Identifier { name, .. } => assert_eq!(*name, "z"),
+                            _ => panic!("Expected identifier pattern"),
+                        }
+                    }
+                    _ => panic!("Expected tuple pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_tuple_pattern_with_ignore() {
+        let input = r#"
+            agent test() {
+                var (_, result, _) = spawn().await
+            }
+        "#;
+        let program = parse(input).expect("Should parse tuple pattern with ignore");
+
+        let func = match &program.items[0] {
+            Item::Agent(f) => f,
+            _ => panic!("Expected agent"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, init: _ } => {
+                match pattern {
+                    Pattern::Tuple(patterns) => {
+                        assert_eq!(patterns.len(), 3);
+                        assert!(matches!(patterns[0], Pattern::Ignore));
+                        match &patterns[1] {
+                            Pattern::Identifier { name, .. } => assert_eq!(*name, "result"),
+                            _ => panic!("Expected identifier pattern"),
+                        }
+                        assert!(matches!(patterns[2], Pattern::Ignore));
+                    }
+                    _ => panic!("Expected tuple pattern"),
+                }
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
+
+    #[test]
+    fn test_ignore_pattern_standalone() {
+        let input = r#"
+            agent test() {
+                var _ = expensive_computation()
+            }
+        "#;
+        let program = parse(input).expect("Should parse standalone ignore pattern");
+
+        let func = match &program.items[0] {
+            Item::Agent(f) => f,
+            _ => panic!("Expected agent"),
+        };
+
+        match &func.body.statements[0] {
+            Statement::VarDecl { pattern, init: _ } => {
+                assert!(matches!(pattern, Pattern::Ignore));
+            }
+            _ => panic!("Expected var decl"),
+        }
+    }
