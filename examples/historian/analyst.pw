@@ -3,40 +3,42 @@ import std.log
 # Analyzes the git repository, creates a commit plan, determines build configuration, and sends
 # instructions to the narrator and scribe agents.
 #
-# @arg session_id 
-# @arg work_dir 
-# @arg changeset_description
+# @arg description
 #
 # @color purple
-export default agent analyst(session_id, work_dir, changeset_description) {
-    $ mkdir -p "${work_dir}/narrator"
-    $ mkdir -p "${work_dir}/analyst"
+export default worker analyst(description: string) {
+    var narrator = self.session.mailbox.narrator
+    var scribe = self.session.mailbox.scribe
+    var dir = self.session.dir
+
+    $ mkdir -p "${dir}/narrator"
+    $ mkdir -p "${dir}/analyst"
 
     log("Starting analysis")
 
     # Check for clean working tree
     if !($ git diff_index --quiet HEAD --) {
-      $ echo "error" > "${work_dir}/analyst/status"
+      $ echo "error" > "${dir}/analyst/status"
       log("ERROR: Working tree not clean")
-      fail
+      throw "Working tree not clean"
     }
 
     var branch = $(git rev_parse --abbrev_ref HEAD)
 
     # Check for detached HEAD
     if branch = "HEAD" {
-        $ echo "error" > "${work_dir}/analyst/status"
+        $ echo "error" > "${dir}/analyst/status"
         log("ERROR: Detached HEAD")
-        fail
+        throw "Detached HEAD"
     }
 
     # Get base commit and create clean branch
     var base_commit = $(git merge_base HEAD origin/main 2>/dev/null || git merge_base HEAD main)
-    var timestamp = $(echo "$session_id" | sed 's/historian-//')
+    var timestamp = self.timestamp
     var clean_branch = "${branch}-${timestamp}-clean"
 
     # Create master diff
-    $ git diff "${base_commit}"..HEAD > "${work_dir}/master.diff"
+    $ git diff "${base_commit}"..HEAD > "${dir}/master.diff"
 
     # Create clean branch
     $ git checkout -b "${clean_branch}" "${base_commit}"
@@ -72,9 +74,15 @@ export default agent analyst(session_id, work_dir, changeset_description) {
     }
 
     var commit_plan = think {
-        Read `${work_dir}/master.diff` and analyze the changes.
+        The user produced this changeset description:
 
-        Based on the diff and the changeset description, create a commit plan that:
+            <quote>
+            ${description}
+            </quote>
+
+        Read `${dir}/master.diff` and analyze the changes.
+
+        Based on the diff and the description, create a commit plan that:
         - Breaks changes into 5-15 logical commits
         - Follows a progression (infrastructure -> core -> features -> polish -> tests/docs)
         - Each commit is independently reviewable
@@ -110,12 +118,12 @@ export default agent analyst(session_id, work_dir, changeset_description) {
     if !approval {
         $ git checkout "${branch}"
         $ git branch -D "${clean_branch}"
-        $ echo "error" > "${work_dir}/analyst/status"
+        $ echo "error" > "${dir}/analyst/status"
         log("User cancelled")
-        fail
+        throw "User cancelled"
     }
 
-    narrator.send(session_id, {
+    narrator.send({
         type: "commit_plan",
         branch: branch,
         clean_branch: clean_branch,
@@ -126,7 +134,7 @@ export default agent analyst(session_id, work_dir, changeset_description) {
 
     log("Sent commit plan to narrator")
 
-    scribe.send(session_id, {
+    narrator.send({
         type: "build_config",
         build_command # e.g., "cargo check" or null
     })
@@ -134,17 +142,17 @@ export default agent analyst(session_id, work_dir, changeset_description) {
     log("Sent build config to scribe")
 
     cat({
-        session_id,
+        session_id: self.session.id,
         timestamp,
         original_branch: branch,
         clean_branch,
         base_commit,
-        work_dir,
+        work_dir: dir,
         build_command,
         total_commits: commit_plan.length
-    }) > "${work_dir}/state.json"
+    }) > "${dir}/state.json"
 
-    $ echo "done" > "${work_dir}/analyst/status"
+    $ echo "done" > "${dir}/analyst/status"
 
     log("Analysis complete, exiting")
 }

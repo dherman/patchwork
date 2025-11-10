@@ -35,11 +35,11 @@ fn write_item(out: &mut String, item: &Item, indent: usize) -> std::fmt::Result 
             write_params(out, &decl.params, indent + 1)?;
             write_block(out, &decl.body, indent + 1)?;
         }
-        Item::Agent(decl) => {
+        Item::Worker(decl) => {
             let mut modifiers = String::new();
             if decl.is_exported { modifiers.push_str("export "); }
             if decl.is_default { modifiers.push_str("default "); }
-            writeln!(out, "{}{}Agent: {}", prefix, modifiers, decl.name)?;
+            writeln!(out, "{}{}Worker: {}", prefix, modifiers, decl.name)?;
             write_params(out, &decl.params, indent + 1)?;
             write_block(out, &decl.body, indent + 1)?;
         }
@@ -169,9 +169,6 @@ fn write_statement(out: &mut String, stmt: &Statement, indent: usize) -> std::fm
         }
         Statement::Succeed => {
             writeln!(out, "{}Succeed", prefix)?;
-        }
-        Statement::Fail => {
-            writeln!(out, "{}Fail", prefix)?;
         }
         Statement::Break => {
             writeln!(out, "{}Break", prefix)?;

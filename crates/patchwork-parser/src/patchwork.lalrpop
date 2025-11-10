@@ -38,7 +38,7 @@ extern {
         "for" => ParserToken::For,
         "while" => ParserToken::While,
         "await" => ParserToken::Await,
-        "agent" => ParserToken::Agent,
+        "worker" => ParserToken::Worker,
         "trait" => ParserToken::Trait,
         "skill" => ParserToken::Skill,
         "fun" => ParserToken::Fun,
@@ -46,7 +46,7 @@ extern {
         "type" => ParserToken::Type,
         "return" => ParserToken::Return,
         "succeed" => ParserToken::Succeed,
-        "fail" => ParserToken::Fail,
+        "throw" => ParserToken::Throw,
         "break" => ParserToken::Break,
         "self" => ParserToken::SelfKw,
         "in" => ParserToken::In,
@@ -141,14 +141,14 @@ ObjectKey: &'input str = {
     "else" => "else",
     "for" => "for",
     "while" => "while",
-    "agent" => "agent",
+    "worker" => "worker",
     "trait" => "trait",
     "skill" => "skill",
     "fun" => "fun",
     "default" => "default",
     "return" => "return",
     "succeed" => "succeed",
-    "fail" => "fail",
+    "throw" => "throw",
     "break" => "break",
     "self" => "self",
     "in" => "in",
@@ -173,7 +173,7 @@ pub Program: Program<'input> = {
 Item: Item<'input> = {
     <ImportDecl> => Item::Import(<>),
     <SkillDecl> => Item::Skill(<>),
-    <AgentDecl> => Item::Agent(<>),
+    <WorkerDecl> => Item::Worker(<>),
     <TraitDecl> => Item::Trait(<>),
     <FunctionDecl> => Item::Function(<>),
     <TypeDecl> => Item::Type(<>),
@@ -210,11 +210,11 @@ SkillDecl: SkillDecl<'input> = {
     },
 };
 
-// Agent declaration: agent name(params) { body }
-AgentDecl: AgentDecl<'input> = {
-    // Accept both "agent test (" and "agent test("
-    <is_exported:"export"?> <is_default:"default"?> "agent" <name:identifier> "("? <params:ParamList> ")" <body:Block> => {
-        AgentDecl { name, params, body, is_exported: is_exported.is_some(), is_default: is_default.is_some() }
+// Worker declaration: worker name(params) { body }
+WorkerDecl: WorkerDecl<'input> = {
+    // Accept both "worker test (" and "worker test("
+    <is_exported:"export"?> <is_default:"default"?> "worker" <name:identifier> "("? <params:ParamList> ")" <body:Block> => {
+        WorkerDecl { name, params, body, is_exported: is_exported.is_some(), is_default: is_default.is_some() }
     },
 };
 
@@ -326,7 +326,6 @@ Statement: Statement<'input> = {
     // Keywords that can't start expressions - unambiguous
     <ReturnStmt>,
     <SucceedStmt>,
-    <FailStmt>,
     <BreakStmt>,
 
     // Shell statement: $ command args (Milestone 10)
@@ -393,13 +392,9 @@ ReturnStmt: Statement<'input> = {
     "return" <e:Expr?> => Statement::Return(e),
 };
 
-// Succeed/Fail/Break - these are unambiguous keywords
+// Succeed/Break - these are unambiguous keywords
 SucceedStmt: Statement<'input> = {
     "succeed" => Statement::Succeed,
-};
-
-FailStmt: Statement<'input> = {
-    "fail" => Statement::Fail,
 };
 
 BreakStmt: Statement<'input> = {
@@ -666,6 +661,10 @@ UnaryExpr: Expr<'input> = {
     },
     "-" <operand:UnaryExpr> => Expr::Unary {
         op: UnOp::Neg,
+        operand: Box::new(operand),
+    },
+    "throw" <operand:UnaryExpr> => Expr::Unary {
+        op: UnOp::Throw,
         operand: Box::new(operand),
     },
     PostfixExpr,

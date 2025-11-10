@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn test_parse_task() {
-        let input = "agent analyst(session_id, work_dir, changeset) {}";
+        let input = "worker analyst(session_id, work_dir, changeset) {}";
         let result = parse(input);
         assert!(result.is_ok(), "Failed to parse task: {:?}", result);
 
@@ -139,14 +139,14 @@ mod tests {
         assert_eq!(program.items.len(), 1);
 
         match &program.items[0] {
-            Item::Agent(decl) => {
+            Item::Worker(decl) => {
                 assert_eq!(decl.name, "analyst");
                 assert_eq!(decl.params.len(), 3);
                 assert_eq!(decl.params[0].name, "session_id");
                 assert_eq!(decl.params[1].name, "work_dir");
                 assert_eq!(decl.params[2].name, "changeset");
             }
-            _ => panic!("Expected Agent item"),
+            _ => panic!("Expected Worker item"),
         }
     }
 
@@ -177,8 +177,8 @@ mod tests {
 
             skill rewriting_git_branch(changeset_description) {}
 
-            agent analyst(session_id) {}
-            agent narrator(session_id) {}
+            worker analyst(session_id) {}
+            worker narrator(session_id) {}
 
             fun helper() {}
         "#;
@@ -191,8 +191,8 @@ mod tests {
         // Check item types
         assert!(matches!(program.items[0], Item::Import(_)));
         assert!(matches!(program.items[1], Item::Skill(_)));
-        assert!(matches!(program.items[2], Item::Agent(_)));
-        assert!(matches!(program.items[3], Item::Agent(_)));
+        assert!(matches!(program.items[2], Item::Worker(_)));
+        assert!(matches!(program.items[3], Item::Worker(_)));
         assert!(matches!(program.items[4], Item::Function(_)));
     }
 
@@ -243,7 +243,7 @@ mod tests {
     #[test]
     fn test_var_decl_no_init() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var x
             }
         "#;
@@ -252,8 +252,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 1);
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn test_var_decl_with_init() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var x = foo
             }
         "#;
@@ -284,8 +284,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 1);
@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn test_var_decl_with_type() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var x: string
             }
         "#;
@@ -320,8 +320,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 1);
@@ -347,7 +347,7 @@ mod tests {
     #[test]
     fn test_var_decl_with_type_and_init() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var x: int = 42
             }
         "#;
@@ -356,8 +356,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 1);
@@ -381,7 +381,7 @@ mod tests {
     #[test]
     fn test_if_statement() {
         let input = r#"
-            agent test() {
+            worker test() {
                 if condition {
                     var x = 1
                 }
@@ -392,8 +392,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 1);
@@ -413,7 +413,7 @@ mod tests {
     #[test]
     fn test_if_else_statement() {
         let input = r#"
-            agent test() {
+            worker test() {
                 if x {
                     var a = 1
                 } else {
@@ -426,8 +426,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -443,7 +443,7 @@ mod tests {
     #[test]
     fn test_for_loop() {
         let input = r#"
-            agent test() {
+            worker test() {
                 for var item in items {
                     var x = item
                 }
@@ -454,8 +454,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -474,7 +474,7 @@ mod tests {
     #[test]
     fn test_while_loop() {
         let input = r#"
-            agent test() {
+            worker test() {
                 while (condition) {
                     var x = 1
                 }
@@ -485,8 +485,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -506,7 +506,7 @@ mod tests {
     #[test]
     fn test_return_no_value() {
         let input = r#"
-            agent test() {
+            worker test() {
                 return
             }
         "#;
@@ -515,8 +515,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -530,7 +530,7 @@ mod tests {
     #[test]
     fn test_return_with_value() {
         let input = r#"
-            agent test() {
+            worker test() {
                 return value
             }
         "#;
@@ -539,8 +539,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -556,26 +556,32 @@ mod tests {
     }
 
     #[test]
-    fn test_succeed_fail_break() {
+    fn test_succeed_throw_break() {
         let input = r#"
-            agent test() {
+            worker test() {
                 succeed
-                fail
+                throw "error message"
                 break
             }
         "#;
         let result = parse(input);
-        assert!(result.is_ok(), "Failed to parse succeed/fail/break: {:?}", result);
+        assert!(result.is_ok(), "Failed to parse succeed/throw/break: {:?}", result);
 
         let program = result.unwrap();
         let task = match &program.items[0] {
-            Item::Agent(t) => t,
-            _ => panic!("Expected agent"),
+            Item::Worker(t) => t,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(task.body.statements.len(), 3);
         assert!(matches!(task.body.statements[0], Statement::Succeed));
-        assert!(matches!(task.body.statements[1], Statement::Fail));
+
+        // Check throw is a unary expression
+        match &task.body.statements[1] {
+            Statement::Expr(Expr::Unary { op: UnOp::Throw, .. }) => {},
+            _ => panic!("Expected throw expression"),
+        }
+
         assert!(matches!(task.body.statements[2], Statement::Break));
     }
 
@@ -586,7 +592,7 @@ mod tests {
         // Key test: newlines SEPARATE statements (Swift-style)
         // return\nx means: return nothing, then x as next statement
         let input = r#"
-            agent test() {
+            worker test() {
                 return
                 x
             }
@@ -596,8 +602,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         // Should have TWO statements: return (no value) and x (expression statement)
@@ -621,7 +627,7 @@ mod tests {
     #[test]
     fn test_semicolon_separator() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var x = 1; var y = 2; var z = 3
             }
         "#;
@@ -630,8 +636,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         // Should have 3 statements on one line
@@ -641,7 +647,7 @@ mod tests {
     #[test]
     fn test_multiple_statements_newline_separated() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var x = 1
                 var y = 2
                 if x {
@@ -655,8 +661,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 4);
@@ -665,7 +671,7 @@ mod tests {
     #[test]
     fn test_expression_statement() {
         let input = r#"
-            agent test() {
+            worker test() {
                 foo
                 42
                 true
@@ -676,8 +682,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 3);
@@ -691,7 +697,7 @@ mod tests {
     #[test]
     fn test_literals() {
         let input = r#"
-            agent test() {
+            worker test() {
                 42
                 "hello"
                 true
@@ -704,8 +710,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 5);
@@ -719,7 +725,7 @@ mod tests {
     #[test]
     fn test_string_literal() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var x = "hello"
             }
         "#;
@@ -728,8 +734,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -756,7 +762,7 @@ mod tests {
     #[test]
     fn test_binary_arithmetic() {
         let input = r#"
-            agent test() {
+            worker test() {
                 1 + 2
                 x - y
                 a * b
@@ -768,8 +774,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 4);
@@ -787,7 +793,7 @@ mod tests {
     fn test_operator_precedence() {
         // Test that 1 + 2 * 3 parses as 1 + (2 * 3), not (1 + 2) * 3
         let input = r#"
-            agent test() {
+            worker test() {
                 var x = 1 + 2 * 3
             }
         "#;
@@ -796,8 +802,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -823,7 +829,7 @@ mod tests {
     #[test]
     fn test_comparison_operators() {
         let input = r#"
-            agent test() {
+            worker test() {
                 x == y
                 a != b
                 c < d
@@ -835,8 +841,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 4);
@@ -855,7 +861,7 @@ mod tests {
     #[test]
     fn test_logical_operators() {
         let input = r#"
-            agent test() {
+            worker test() {
                 a && b
                 x || y
             }
@@ -865,8 +871,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 2);
@@ -885,7 +891,7 @@ mod tests {
     #[test]
     fn test_unary_operators() {
         let input = r#"
-            agent test() {
+            worker test() {
                 !x
                 -5
             }
@@ -895,8 +901,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 2);
@@ -915,7 +921,7 @@ mod tests {
     #[test]
     fn test_function_call() {
         let input = r#"
-            agent test() {
+            worker test() {
                 log(a, b, c)
             }
         "#;
@@ -924,8 +930,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -943,7 +949,7 @@ mod tests {
     #[test]
     fn test_member_access() {
         let input = r#"
-            agent test() {
+            worker test() {
                 commit.num
                 plan.length
             }
@@ -953,8 +959,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 2);
@@ -974,7 +980,7 @@ mod tests {
     #[test]
     fn test_method_call() {
         let input = r#"
-            agent test() {
+            worker test() {
                 self.receive(timeout)
             }
         "#;
@@ -983,8 +989,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1009,7 +1015,7 @@ mod tests {
     #[test]
     fn test_index_access() {
         let input = r#"
-            agent test() {
+            worker test() {
                 arr[i]
                 data[0]
             }
@@ -1019,8 +1025,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         assert_eq!(func.body.statements.len(), 2);
@@ -1043,7 +1049,7 @@ mod tests {
     #[test]
     fn test_range_operator() {
         let input = r#"
-            agent test() {
+            worker test() {
                 1...3
             }
         "#;
@@ -1052,8 +1058,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1068,7 +1074,7 @@ mod tests {
     #[test]
     fn test_parenthesized_expr() {
         let input = r#"
-            agent test() {
+            worker test() {
                 (x + y) * z
             }
         "#;
@@ -1077,8 +1083,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         // Should parse as Mul(Paren(Add(x, y)), z)
@@ -1102,7 +1108,7 @@ mod tests {
     #[test]
     fn test_complex_nested_expression() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var x = self.receive(timeout).status == "success"
             }
         "#;
@@ -1111,8 +1117,8 @@ mod tests {
 
         let program = result.unwrap();
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         // Should parse successfully - verify it's a var decl with a complex init
@@ -1134,7 +1140,7 @@ mod tests {
     #[test]
     fn test_simple_think_block() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var x = think {
                     What is the answer?
                 }
@@ -1145,7 +1151,7 @@ mod tests {
 
         // Verify it's a task with a var decl containing a Think expression
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 assert_eq!(task.body.statements.len(), 1);
                 match &task.body.statements[0] {
                     Statement::VarDecl { pattern, init } => {
@@ -1162,14 +1168,14 @@ mod tests {
                     _ => panic!("Expected var decl"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
     #[test]
     fn test_simple_ask_block() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var approval = ask {
                     Do you approve?
                 }
@@ -1179,7 +1185,7 @@ mod tests {
         assert_eq!(program.items.len(), 1);
 
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 assert_eq!(task.body.statements.len(), 1);
                 match &task.body.statements[0] {
                     Statement::VarDecl { init, .. } => {
@@ -1191,14 +1197,14 @@ mod tests {
                     _ => panic!("Expected var decl"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
     #[test]
     fn test_think_with_fallback() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var cmd = think {
                     Figure it out
                 } || ask {
@@ -1211,7 +1217,7 @@ mod tests {
 
         // The || creates a Binary expr with Think on left and Ask on right
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 match &task.body.statements[0] {
                     Statement::VarDecl { init, .. } => {
                         match init.as_ref().unwrap() {
@@ -1226,14 +1232,14 @@ mod tests {
                     _ => panic!("Expected var decl"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
     #[test]
     fn test_prompt_with_embedded_do() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var result = think {
                     First analyze the problem.
                     do {
@@ -1249,7 +1255,7 @@ mod tests {
         // PromptBlock should have multiple items: text words, then code block, then more text words
         // Note: lexer splits prompt text into individual words
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 match &task.body.statements[0] {
                     Statement::VarDecl { init, .. } => {
                         match init.as_ref().unwrap() {
@@ -1273,7 +1279,7 @@ mod tests {
                     _ => panic!("Expected var decl"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
@@ -1284,7 +1290,7 @@ mod tests {
     #[test]
     fn test_multiline_think_block() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var build_command = think {
                     Figure out how to run a lightweight build for this project:
 
@@ -1306,7 +1312,7 @@ mod tests {
     fn test_nested_prompts_in_binary_expr() {
         // think { } || ask { } is a binary OR expression
         let input = r#"
-            agent foo() {
+            worker foo() {
                 var x = think { analyze } || ask { what should I do? }
             }
         "#;
@@ -1318,7 +1324,7 @@ mod tests {
     fn test_balanced_braces_in_prompt() {
         // Test that balanced braces in prompts are treated as literal text
         let input = r#"
-            agent example() {
+            worker example() {
                 var result = think {
                     Return an object: {name: "test", value: 42}
                 }
@@ -1332,7 +1338,7 @@ mod tests {
     fn test_nested_balanced_braces_in_prompt() {
         // Test nested balanced braces
         let input = r#"
-            agent example() {
+            worker example() {
                 var result = think {
                     Return: {outer: {inner: 123}}
                 }
@@ -1346,7 +1352,7 @@ mod tests {
     fn test_prompt_escape_syntax() {
         // Test $'<char>' escape syntax for literal characters
         let input = r#"
-            agent example() {
+            worker example() {
                 var result = think {
                     Use $'{' for literal left brace
                     Use $'}' for literal right brace
@@ -1362,7 +1368,7 @@ mod tests {
     fn test_balanced_braces_with_interpolation() {
         // Test that interpolation still works inside balanced braces
         let input = r#"
-            agent example() {
+            worker example() {
                 var name = "test"
                 var result = think {
                     Object: {name: $name, value: ${40 + 2}}
@@ -1377,7 +1383,7 @@ mod tests {
     fn test_adjacent_text_nodes_merged() {
         // Test that adjacent text nodes in prompt blocks are merged into single Text node
         let input = r#"
-            agent example() {
+            worker example() {
                 var result = think {
                     This is a multi-word sentence
                     with $variable interpolation and
@@ -1387,9 +1393,9 @@ mod tests {
         "#;
         let program = parse(input).expect("Should parse");
 
-        // Extract the prompt block from: program -> agent -> var decl -> think expr
+        // Extract the prompt block from: program -> worker -> var decl -> think expr
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 match &task.body.statements[0] {
                     Statement::VarDecl { init, .. } => {
                         match init.as_ref().unwrap() {
@@ -1432,7 +1438,7 @@ mod tests {
                     _ => panic!("Expected var decl"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
@@ -1442,14 +1448,14 @@ mod tests {
     fn test_string_interpolation_simple_id() {
         // Test: $id form
         let input = r#"
-            agent test() {
+            worker test() {
                 var greeting = "Hello $name"
             }
         "#;
         let program = parse(input).expect("Should parse");
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1482,14 +1488,14 @@ mod tests {
     fn test_string_interpolation_expr() {
         // Test: ${expr} form
         let input = r#"
-            agent test() {
+            worker test() {
                 var msg = "Total: ${x + y}"
             }
         "#;
         let program = parse(input).expect("Should parse");
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1523,14 +1529,14 @@ mod tests {
         // Test: $(expr) form - parses expr as expression
         // Note: The content is parsed as a patchwork expression
         let input = r#"
-            agent test() {
+            worker test() {
                 var session = "session-$(timestamp)"
             }
         "#;
         let program = parse(input).expect("Should parse");
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1563,14 +1569,14 @@ mod tests {
     fn test_string_interpolation_multiple() {
         // Test: Multiple interpolations in one string
         let input = r#"
-            agent test() {
+            worker test() {
                 var msg = "Hello $first $last"
             }
         "#;
         let program = parse(input).expect("Should parse");
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1617,14 +1623,14 @@ mod tests {
     fn test_string_interpolation_all_forms() {
         // Test: Mix of $id, ${expr}, and $(expr)
         let input = r#"
-            agent test() {
+            worker test() {
                 var path = "$base/${work_dir}/state-$(timestamp).json"
             }
         "#;
         let program = parse(input).expect("Should parse");
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1696,7 +1702,7 @@ mod tests {
     fn test_string_interpolation_historian_examples() {
         // Test: Real examples from historian
         let input = r#"
-            agent test() {
+            worker test() {
                 var session = "historian-${timestamp}"
                 var tmp_dir = "/tmp/${session_id}"
                 var state_file = "${work_dir}/state.json"
@@ -1711,7 +1717,7 @@ mod tests {
     #[test]
     fn test_array_literal_empty() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var arr = []
             }
         "#;
@@ -1719,8 +1725,8 @@ mod tests {
         assert_eq!(program.items.len(), 1);
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1741,15 +1747,15 @@ mod tests {
     #[test]
     fn test_array_literal_with_elements() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var arr = [1, 2, 3]
             }
         "#;
         let program = parse(input).expect("Should parse array with elements");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1772,15 +1778,15 @@ mod tests {
     #[test]
     fn test_array_with_objects() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var arr = [{num: 1}, {num: 2}]
             }
         "#;
         let program = parse(input).expect("Should parse array with objects");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1806,15 +1812,15 @@ mod tests {
     #[test]
     fn test_object_literal_empty() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var obj = {}
             }
         "#;
         let program = parse(input).expect("Should parse empty object");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1831,15 +1837,15 @@ mod tests {
     #[test]
     fn test_object_literal_with_fields() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var obj = {x: 1, y: 2}
             }
         "#;
         let program = parse(input).expect("Should parse object with fields");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1862,15 +1868,15 @@ mod tests {
     #[test]
     fn test_object_literal_shorthand() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var obj = {session_id, timestamp}
             }
         "#;
         let program = parse(input).expect("Should parse object with shorthand");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1893,15 +1899,15 @@ mod tests {
     #[test]
     fn test_object_literal_mixed() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var obj = {x: 1, y}
             }
         "#;
         let program = parse(input).expect("Should parse object with mixed syntax");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1924,15 +1930,15 @@ mod tests {
     #[test]
     fn test_destructuring_simple() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var {x, y} = obj
             }
         "#;
         let program = parse(input).expect("Should parse simple destructuring");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -1955,15 +1961,15 @@ mod tests {
     #[test]
     fn test_destructuring_with_types() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var {x: string, y: int} = obj
             }
         "#;
         let program = parse(input).expect("Should parse destructuring with types");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -2063,15 +2069,15 @@ mod tests {
         // Test a complex expression from historian examples
         // Note: Object literals on one line to avoid newline parsing issues
         let input = r#"
-            agent test() {
+            worker test() {
                 var plan = {commits: [{num: 1, description: "first"}], session_id}
             }
         "#;
         let program = parse(input).expect("Should parse complex nested structure");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -2103,15 +2109,15 @@ mod tests {
     fn test_simple_type_annotation() {
         // Test simple type annotation in variable declaration
         let input = r#"
-            agent test() {
+            worker test() {
                 var x: string
             }
         "#;
         let program = parse(input).expect("Should parse simple type annotation");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -2136,15 +2142,15 @@ mod tests {
     fn test_array_type() {
         // Test array type: var items: [string]
         let input = r#"
-            agent test() {
+            worker test() {
                 var items: [string]
             }
         "#;
         let program = parse(input).expect("Should parse array type");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -2173,15 +2179,15 @@ mod tests {
     fn test_union_type() {
         // Test union type: status: "success" | "error"
         let input = r#"
-            agent test() {
+            worker test() {
                 var status: "success" | "error"
             }
         "#;
         let program = parse(input).expect("Should parse union type");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -2215,15 +2221,15 @@ mod tests {
     fn test_object_type() {
         // Test object type: var msg: {x: string, y: int}
         let input = r#"
-            agent test() {
+            worker test() {
                 var msg: {x: string, y: int}
             }
         "#;
         let program = parse(input).expect("Should parse object type");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -2259,15 +2265,15 @@ mod tests {
     fn test_destructuring_with_type_annotations() {
         // Test destructuring with type annotations: var {x: string, y: int} = msg
         let input = r#"
-            agent test() {
+            worker test() {
                 var {x: string, y: int} = msg
             }
         "#;
         let program = parse(input).expect("Should parse destructuring with types");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -2385,15 +2391,15 @@ mod tests {
     fn test_nested_array_type() {
         // Test nested array type: [[string]]
         let input = r#"
-            agent test() {
+            worker test() {
                 var matrix: [[string]]
             }
         "#;
         let program = parse(input).expect("Should parse nested array type");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -2427,15 +2433,15 @@ mod tests {
     fn test_complex_union_type() {
         // Test union of multiple types: string | int | "none"
         let input = r#"
-            agent test() {
+            worker test() {
                 var value: string | int | "none"
             }
         "#;
         let program = parse(input).expect("Should parse complex union type");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -2473,15 +2479,15 @@ mod tests {
     fn test_array_of_object_type() {
         // Test array of object type: [{name: string, value: int}]
         let input = r#"
-            agent test() {
+            worker test() {
                 var records: [{name: string, value: int}]
             }
         "#;
         let program = parse(input).expect("Should parse array of object type");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -2576,12 +2582,12 @@ mod tests {
 
     #[test]
     fn test_inline_comment() {
-        let input = "agent test() { var x = 1  # this is a comment\n}";
+        let input = "worker test() { var x = 1  # this is a comment\n}";
         let program = parse(input).unwrap();
         assert_eq!(program.items.len(), 1);
 
         match &program.items[0] {
-            Item::Agent(func) => {
+            Item::Worker(func) => {
                 assert_eq!(func.body.statements.len(), 1);
                 match &func.body.statements[0] {
                     Statement::VarDecl { pattern, init } => {
@@ -2594,13 +2600,13 @@ mod tests {
                     _ => panic!("Expected VarDecl"),
                 }
             }
-            _ => panic!("Expected agent with body"),
+            _ => panic!("Expected worker with body"),
         }
     }
 
     #[test]
     fn test_comment_before_declaration() {
-        let input = "# This is a comment\nagent test() {}";
+        let input = "# This is a comment\nworker test() {}";
         let program = parse(input).unwrap();
         assert_eq!(program.items.len(), 1);
     }
@@ -2608,7 +2614,7 @@ mod tests {
     #[test]
     fn test_comment_between_statements() {
         let input = r#"
-agent test() {
+worker test() {
     var x = 1
     # Comment in the middle
     var y = 2
@@ -2618,10 +2624,10 @@ agent test() {
         assert_eq!(program.items.len(), 1);
 
         match &program.items[0] {
-            Item::Agent(func) => {
+            Item::Worker(func) => {
                 assert_eq!(func.body.statements.len(), 2);
             }
-            _ => panic!("Expected agent with body"),
+            _ => panic!("Expected worker with body"),
         }
     }
 
@@ -2630,17 +2636,17 @@ agent test() {
         let input = r#"
 # @arg session_id
 # @arg work_dir
-agent foo(session_id, work_dir) {}
+worker foo(session_id, work_dir) {}
 "#;
         let program = parse(input).unwrap();
         assert_eq!(program.items.len(), 1);
 
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 assert_eq!(task.name, "foo");
                 assert_eq!(task.params.len(), 2);
             }
-            _ => panic!("Expected agent declaration"),
+            _ => panic!("Expected worker declaration"),
         }
     }
 
@@ -2698,7 +2704,7 @@ skill bar(x) {
     #[test]
     fn test_comment_in_expression() {
         let input = r#"
-agent test() {
+worker test() {
     var result = 1 + 2  # adding numbers
 }
 "#;
@@ -2709,7 +2715,7 @@ agent test() {
     #[test]
     fn test_comment_in_if_statement() {
         let input = r#"
-agent test() {
+worker test() {
     if x {  # condition
         # inside then block
         var y = 1
@@ -2723,7 +2729,7 @@ agent test() {
         assert_eq!(program.items.len(), 1);
 
         match &program.items[0] {
-            Item::Agent(func) => {
+            Item::Worker(func) => {
                 match &func.body.statements[0] {
                     Statement::If { then_block, else_block, .. } => {
                         assert_eq!(then_block.statements.len(), 1);
@@ -2732,14 +2738,14 @@ agent test() {
                     _ => panic!("Expected if statement"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
     #[test]
     fn test_comment_in_loop() {
         let input = r#"
-agent test() {
+worker test() {
     for var i in items {
         # Process each item
         log(i)  # log it
@@ -2754,7 +2760,7 @@ agent test() {
     fn test_comment_with_type_annotation() {
         let input = r#"
 # Type annotation example
-agent test() {
+worker test() {
     var x: string = "hello"  # string variable
 }
 "#;
@@ -2765,7 +2771,7 @@ agent test() {
     #[test]
     fn test_comment_with_spaces() {
         // Test comment with just spaces (more realistic than truly empty #)
-        let input = "# Comment line 1\n#  \n# Comment line 2\nagent test() {}";
+        let input = "# Comment line 1\n#  \n# Comment line 2\nworker test() {}";
         let program = parse(input).unwrap();
         assert_eq!(program.items.len(), 1);
     }
@@ -2985,7 +2991,7 @@ skill rewriting_git_branch(changeset_description) {
         assert_eq!(program.items.len(), 2);
 
         match &program.items[1] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 assert_eq!(task.name, "analyst");
 
                 // Find a var decl that has think || ask pattern
@@ -3003,18 +3009,18 @@ skill rewriting_git_branch(changeset_description) {
                 }
                 assert!(found_think_ask, "Should find think {{ ... }} || ask {{ ... }} pattern");
             }
-            _ => panic!("Expected Agent"),
+            _ => panic!("Expected Worker"),
         }
     }
 
     #[test]
     fn test_validate_command_substitution_structure() {
         // Validate command substitution creates correct AST
-        let input = "agent test() { var x = $(date +%s) }";
+        let input = "worker test() { var x = $(date +%s) }";
         let program = parse(input).expect("Should parse");
 
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 match &task.body.statements[0] {
                     Statement::VarDecl { pattern, init } => {
                         match pattern {
@@ -3048,18 +3054,18 @@ skill rewriting_git_branch(changeset_description) {
                     _ => panic!("Expected var decl"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
     #[test]
     fn test_validate_bare_command_structure() {
         // Validate bare command creates correct AST
-        let input = "agent test() {\n    $ mkdir -p work_dir\n}";
+        let input = "worker test() {\n    $ mkdir -p work_dir\n}";
         let program = parse(input).expect("Should parse");
 
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 match &task.body.statements[0] {
                     Statement::Expr(Expr::BareCommand { name, args }) => {
                         assert_eq!(*name, "mkdir");
@@ -3078,18 +3084,18 @@ skill rewriting_git_branch(changeset_description) {
                     _ => panic!("Expected BareCommand expression statement"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
     #[test]
     fn test_validate_string_interpolation_structure() {
         // Validate string interpolation creates correct AST parts
-        let input = r#"agent test() { var x = "session-${timestamp}" }"#;
+        let input = r#"worker test() { var x = "session-${timestamp}" }"#;
         let program = parse(input).expect("Should parse");
 
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 match &task.body.statements[0] {
                     Statement::VarDecl { init: Some(expr), .. } => {
                         match expr {
@@ -3122,7 +3128,7 @@ skill rewriting_git_branch(changeset_description) {
                     _ => panic!("Expected var decl"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
@@ -3140,7 +3146,7 @@ skill rewriting_git_branch(changeset_description) {
         // Verify dump contains key structural elements from analyst.pw
         assert!(dump.contains("Program:"));
         assert!(dump.contains("Import:"));
-        assert!(dump.contains("Agent: analyst"));
+        assert!(dump.contains("Worker: analyst"));
         assert!(dump.contains("VarDecl:"));
         assert!(dump.contains("If:"));
         assert!(dump.contains("Think:"));
@@ -3153,28 +3159,28 @@ skill rewriting_git_branch(changeset_description) {
     // Shell mode tests (Milestone 10)
     #[test]
     fn test_shell_statement() {
-        let input = "agent main() {\n    $ mkdir -p work_dir\n}";
+        let input = "worker main() {\n    $ mkdir -p work_dir\n}";
         let result = parse(input);
         assert!(result.is_ok(), "Failed to parse shell statement: {:?}", result);
     }
 
     #[test]
     fn test_command_substitution() {
-        let input = "agent main() {\n    var branch = $(git rev_parse --abbrev_ref HEAD)\n}";
+        let input = "worker main() {\n    var branch = $(git rev_parse --abbrev_ref HEAD)\n}";
         let result = parse(input);
         assert!(result.is_ok(), "Failed to parse command substitution: {:?}", result);
     }
 
     #[test]
     fn test_shell_expression() {
-        let input = "agent main() {\n    if ($ git diff_index --quiet HEAD --) {\n        succeed\n    }\n}";
+        let input = "worker main() {\n    if ($ git diff_index --quiet HEAD --) {\n        succeed\n    }\n}";
         let result = parse(input);
         assert!(result.is_ok(), "Failed to parse shell expression: {:?}", result);
     }
 
     #[test]
     fn test_negated_shell_expression() {
-        let input = "agent main() {\n    if !($ git diff_index --quiet HEAD --) {\n        fail\n    }\n}";
+        let input = "worker main() {\n    if !($ git diff_index --quiet HEAD --) {\n        fail\n    }\n}";
         let result = parse(input);
         assert!(result.is_ok(), "Failed to parse negated shell expression: {:?}", result);
     }
@@ -3183,7 +3189,7 @@ skill rewriting_git_branch(changeset_description) {
     fn test_shell_operators_structure() {
         // Test that shell operators create proper AST structure
         let input = r#"
-            agent test() {
+            worker test() {
                 var result = $(git merge_base HEAD main 2>/dev/null || git merge_base HEAD master)
             }
         "#;
@@ -3191,7 +3197,7 @@ skill rewriting_git_branch(changeset_description) {
 
         // Navigate to the init expression
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 match &task.body.statements[0] {
                     Statement::VarDecl { init, .. } => {
                         match init.as_ref().unwrap() {
@@ -3239,7 +3245,7 @@ skill rewriting_git_branch(changeset_description) {
                     _ => panic!("Expected var decl"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
@@ -3247,14 +3253,14 @@ skill rewriting_git_branch(changeset_description) {
     fn test_shell_pipe_operator() {
         // Test pipe operator structure
         let input = r#"
-            agent test() {
+            worker test() {
                 $ cat file.txt | grep pattern
             }
         "#;
         let program = parse(input).expect("Should parse pipe operator");
 
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 match &task.body.statements[0] {
                     Statement::Expr(Expr::ShellPipe { left, right }) => {
                         // Left should be "cat file.txt"
@@ -3277,7 +3283,7 @@ skill rewriting_git_branch(changeset_description) {
                     _ => panic!("Expected ShellPipe"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
@@ -3285,14 +3291,14 @@ skill rewriting_git_branch(changeset_description) {
     fn test_shell_redirect_operators() {
         // Test various redirect operators
         let input = r#"
-            agent test() {
+            worker test() {
                 $ echo hello > output.txt
             }
         "#;
         let program = parse(input).expect("Should parse redirect");
 
         match &program.items[0] {
-            Item::Agent(task) => {
+            Item::Worker(task) => {
                 match &task.body.statements[0] {
                     Statement::Expr(Expr::ShellRedirect { command, op, target }) => {
                         assert_eq!(*op, RedirectOp::Out);
@@ -3312,7 +3318,7 @@ skill rewriting_git_branch(changeset_description) {
                     _ => panic!("Expected ShellRedirect"),
                 }
             }
-            _ => panic!("Expected agent"),
+            _ => panic!("Expected worker"),
         }
     }
 
@@ -3320,7 +3326,7 @@ skill rewriting_git_branch(changeset_description) {
     fn test_backtick_interpolation_in_prompt() {
         // Minimal reproduction of the invalid span issue from analyst.pw
         let input = r#"
-agent test() {
+worker test() {
     var commit_plan = think {
         Read `${work_dir}/master.diff` and analyze the changes.
 
@@ -3355,7 +3361,7 @@ mod debug_tests {
     #[test]
     fn test_debug_multiline_ask() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var suggestion = ask {
                     should to
                 }
@@ -3371,7 +3377,7 @@ mod debug_tests {
 
     #[test]
     fn test_export_task() {
-        let input = "export agent analyst(session_id, work_dir) {}";
+        let input = "export worker analyst(session_id, work_dir) {}";
         let result = parse(input);
         assert!(result.is_ok(), "Failed to parse export agent: {:?}", result);
 
@@ -3379,12 +3385,12 @@ mod debug_tests {
         assert_eq!(program.items.len(), 1);
 
         match &program.items[0] {
-            Item::Agent(decl) => {
+            Item::Worker(decl) => {
                 assert_eq!(decl.name, "analyst");
                 assert_eq!(decl.params.len(), 2);
-                assert!(decl.is_exported, "Agent should be exported");
+                assert!(decl.is_exported, "Worker should be exported");
             }
-            _ => panic!("Expected Agent item"),
+            _ => panic!("Expected Worker item"),
         }
     }
 
@@ -3429,9 +3435,9 @@ mod debug_tests {
     #[test]
     fn test_non_exported_declarations() {
         let input = r#"
-            agent helper() {}
+            worker helper() {}
             fun utility() {}
-            skill worker() {}
+            skill processor() {}
         "#;
         let result = parse(input);
         assert!(result.is_ok(), "Failed to parse non-exported declarations: {:?}", result);
@@ -3440,10 +3446,10 @@ mod debug_tests {
         assert_eq!(program.items.len(), 3);
 
         match &program.items[0] {
-            Item::Agent(decl) => {
-                assert!(!decl.is_exported, "Agent should not be exported");
+            Item::Worker(decl) => {
+                assert!(!decl.is_exported, "Worker should not be exported");
             }
-            _ => panic!("Expected Agent item"),
+            _ => panic!("Expected Worker item"),
         }
 
         match &program.items[1] {
@@ -3464,7 +3470,7 @@ mod debug_tests {
     #[test]
     fn test_mixed_exported_and_non_exported() {
         let input = r#"
-            export agent main() {}
+            export worker main() {}
             fun helper() {}
             export fun utility() {}
         "#;
@@ -3475,11 +3481,11 @@ mod debug_tests {
         assert_eq!(program.items.len(), 3);
 
         match &program.items[0] {
-            Item::Agent(decl) => {
+            Item::Worker(decl) => {
                 assert_eq!(decl.name, "main");
                 assert!(decl.is_exported, "First task should be exported");
             }
-            _ => panic!("Expected Agent item"),
+            _ => panic!("Expected Worker item"),
         }
 
         match &program.items[1] {
@@ -3503,15 +3509,15 @@ mod debug_tests {
     #[test]
     fn test_array_pattern_simple() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var [x, y, z] = triple()
             }
         "#;
         let program = parse(input).expect("Should parse simple array pattern");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -3542,15 +3548,15 @@ mod debug_tests {
     #[test]
     fn test_array_pattern_with_ignore() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var [_, result, _] = spawn().await
             }
         "#;
         let program = parse(input).expect("Should parse array pattern with ignore");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {
@@ -3575,15 +3581,15 @@ mod debug_tests {
     #[test]
     fn test_ignore_pattern_standalone() {
         let input = r#"
-            agent test() {
+            worker test() {
                 var _ = expensive_computation()
             }
         "#;
         let program = parse(input).expect("Should parse standalone ignore pattern");
 
         let func = match &program.items[0] {
-            Item::Agent(f) => f,
-            _ => panic!("Expected agent"),
+            Item::Worker(f) => f,
+            _ => panic!("Expected worker"),
         };
 
         match &func.body.statements[0] {

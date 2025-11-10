@@ -1,14 +1,14 @@
-import ./{analyst, scribe}
 import std.log
 
 # Orchestrates the git commit rewrite process by executing the analyst's commit plan in
 # coordination with the scribe.
 #
-# @arg session_id 
-# @arg work_dir 
-#
 # @color orange
-export default agent narrator(session_id, work_dir) {
+export default worker narrator() {
+    var narrator = self.session.mailbox.narrator
+    var scribe = self.session.mailbox.scribe
+    var dir = self.session.dir
+
     log("Waiting for commit plan from analyst")
 
     var {
@@ -18,7 +18,7 @@ export default agent narrator(session_id, work_dir) {
         base_commit: string,
         timestamp: string,
         commits: [{num: number, description: string}]
-    } = self.receive(10800000)
+    } = narrator.receive(10800000)
 
     log("Received commit plan: ${commits.length} commits")
 
@@ -26,11 +26,8 @@ export default agent narrator(session_id, work_dir) {
 
     for var commit in commits {
         scribe.send({
-            session: session_id,
-            message: {
-                commit_num: commit.num,
-                description: commit.description
-            }
+            commit_num: commit.num,
+            description: commit.description
         })
 
         log("Requested commit ${i}: Add user authentication models")
@@ -42,38 +39,37 @@ export default agent narrator(session_id, work_dir) {
             files_changed: [string]
         }
 
-        var result: scribe_result  = self.receive(10800000)
+        var result: scribe_result  = narrator.receive(10800000)
 
         if status = "error" {
             var description = think { Scribe returned ${scribe_result}. Explain what went wrong }
-            narrator.send({ status, error: description })
             throw "Scribe failed"
         }
         i++
     }
 
-    validate_trees(work_dir, branch, clean_branch)
+    validate_trees(dir, branch, clean_branch)
 
     cat({
-        session_id,
+        session_id: self.session.id,
         timestamp,
         original_branch: branch,
         clean_branch,
         base_commit,
-        work_dir,
+        work_dir: dir,
         commits_created: i
-    }) > "${work_dir}/state.json"
+    }) > "${dir}/state.json"
 
-    scribe.send(session_id, {
+    scribe.send({
         type: "done"
     })
 
-    $ echo "done" > "${work_dir}/narrator/status"
+    $ echo "done" > "${dir}/narrator/status"
 
     log("Complete! Created ${i} commits")
 }
 
-fun validate_trees(work_dir, branch, clean_branch) {
+fun validate_trees(dir, branch, clean_branch) {
     # Compare tree hashes
     $ git checkout "${clean_branch}"
     var clean_tree = $(git rev-parse HEAD^{tree}) # FIXME: what is {tree} here?
@@ -91,15 +87,15 @@ fun validate_trees(work_dir, branch, clean_branch) {
     $ git checkout "${clean_branch}"
 
     # Get the diff of what's missing
-    $ git diff HEAD "${branch}" > "${work_dir}/remaining.diff"
+    $ git diff HEAD "${branch}" > "${dir}/remaining.diff"
 
     # Log what we're adding (with details)
-    var remaining_diff=$(cat "${work_dir}/remaining.diff")
+    var remaining_diff=$(cat "${dir}/remaining.diff")
 
     log("Remaining diff", remaining_diff)
 
     # Apply the remaining changes
-    $ git apply "${work_dir}/remaining.diff"
+    $ git apply "${dir}/remaining.diff"
 
     # Amend the last commit with the missing changes
     $ git commit --amend --no-edit

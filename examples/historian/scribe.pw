@@ -1,24 +1,24 @@
-import ./{analyst, narrator}
 import std.log
 
 # Creates individual git commits by processing requests from the narrator.
 #
-# @arg session_id 
-# @arg work_dir 
-#
 # @color cyan
-export default agent scribe(session_id, work_dir) {
+export default worker scribe() {
+    var narrator = self.session.mailbox.narrator
+    var scribe = self.session.mailbox.scribe
+    var dir = self.session.dir
+
     log("Waiting for build config from analyst")
 
     var {
         type: "build_config",
         build_command: string
-    } = self.receive(10800000)  # 3 hours
+    } = scribe.receive(10800000)  # 3 hours
 
     log("Received build config: ${build_command}")
 
     while (true) {
-        var instruction = self.receive(10800000) # 3 hours
+        var instruction = scribe.receive(10800000) # 3 hours
 
         if instruction.type = "done" {
             log("Received done signal from narrator, exiting")
@@ -34,7 +34,7 @@ export default agent scribe(session_id, work_dir) {
 
         think {
             1. **Read the master diff** (use Read tool):
-            - Read `${work_dir}/master.diff`
+            - Read `${dir}/master.diff`
             - Identify which changes belong to this commit based on the description
 
             2. **Analyze commit size**:
@@ -49,7 +49,7 @@ export default agent scribe(session_id, work_dir) {
                 for var i in 1...3 {
                     log("Running build validation (attempt ${i})")
 
-                    $ eval "${build_command}" 2>&1 | tee "${work_dir}/build-output.log"
+                    $ eval "${build_command}" 2>&1 | tee "${dir}/build-output.log"
                     if $? = 0 {
                         log("Build passed on attempt ${i}")
                         break
@@ -74,19 +74,19 @@ export default agent scribe(session_id, work_dir) {
 
                         think { Apply ${suggestion} }
 
-                        $ eval ${build_command} 2>&1 | tee "${work_dir}/build-output.log"
+                        $ eval ${build_command} 2>&1 | tee "${dir}/build-output.log"
                         if $? != 0 {
                             log("User suggestion failed to fix build")
                             narrator.send({
                                 status: "error",
-                                error: "User suggestion failed to fix build (see ${work_dir}/build-output.log)"
+                                error: "User suggestion failed to fix build (see ${dir}/build-output.log)"
                             })
                             throw "Build failure"
                         }
                     } else {
                         think {
-                            - Use **Read tool** to examine `${work_dir}/build-output.log` for errors
-                            - Use **Read tool** to examine `${work_dir}/master.diff` for potential fixes
+                            - Use **Read tool** to examine `${dir}/build-output.log` for errors
+                            - Use **Read tool** to examine `${dir}/master.diff` for potential fixes
                             - Identify missing changes (imports, types, fields, etc.)
                             - Apply fixes using **Write/Edit** tools
                             - Amend: `git add -A && git commit --amend --no-edit`

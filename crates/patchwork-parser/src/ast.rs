@@ -9,12 +9,12 @@ pub struct Program<'input> {
     pub items: Vec<Item<'input>>,
 }
 
-/// Top-level item (import, skill, agent, trait, function, or type declaration)
+/// Top-level item (import, skill, worker, trait, function, or type declaration)
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item<'input> {
     Import(ImportDecl<'input>),
     Skill(SkillDecl<'input>),
-    Agent(AgentDecl<'input>),
+    Worker(WorkerDecl<'input>),
     Trait(TraitDecl<'input>),
     Function(FunctionDecl<'input>),
     Type(TypeDeclItem<'input>),
@@ -45,9 +45,9 @@ pub struct SkillDecl<'input> {
     pub is_default: bool,
 }
 
-/// Agent declaration: `agent name(params) { body }`
+/// Worker declaration: `worker name(params) { body }`
 #[derive(Debug, Clone, PartialEq)]
-pub struct AgentDecl<'input> {
+pub struct WorkerDecl<'input> {
     pub name: &'input str,
     pub params: Vec<Param<'input>>,
     pub body: Block<'input>,
@@ -153,8 +153,6 @@ pub enum Statement<'input> {
     Return(Option<Expr<'input>>),
     /// Succeed statement (for tasks): `succeed`
     Succeed,
-    /// Fail statement (for tasks): `fail`
-    Fail,
     /// Break statement (for loops): `break`
     Break,
     /// Type declaration: `type Foo = { ... }`
@@ -215,6 +213,7 @@ pub enum BinOp {
 pub enum UnOp {
     Not,      // !
     Neg,      // -
+    Throw,    // throw
 }
 
 /// String literal (Milestone 6: with interpolation support)
