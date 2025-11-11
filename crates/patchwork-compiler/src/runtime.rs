@@ -1,0 +1,14 @@
+//! JavaScript runtime for Patchwork
+//!
+//! This module contains the JavaScript runtime code that gets bundled
+//! with compiled Patchwork programs.
+
+/// Get the complete JavaScript runtime code
+pub fn get_runtime_code() -> &'static str {
+    include_str!("runtime.js")
+}
+
+/// Get the runtime module name that generated code should import from
+pub fn get_runtime_module_name() -> &'static str {
+    "./patchwork-runtime.js"
+}

@@ -49,14 +49,21 @@ fn main() {
                 // In future we could store the AST in the output
                 eprintln!("AST dump not available in Phase 2");
             } else {
-                // Write the generated JavaScript to stdout or file
+                // Phase 3: Write generated code and runtime to stdout
+                // In the future, with --output flag, we'll write to files
                 if args.verbose {
                     println!("Compilation successful!");
                     println!("  Source: {}", output.source_file.display());
                     println!("  Generated {} bytes of JavaScript", output.javascript.len());
+                    println!("  Runtime: {} bytes", output.runtime.len());
                     println!("\nGenerated code:");
                 }
                 println!("{}", output.javascript);
+
+                if args.verbose {
+                    println!("\n=== Runtime (patchwork-runtime.js) ===");
+                    println!("{}", output.runtime);
+                }
             }
         }
         Err(e) => {

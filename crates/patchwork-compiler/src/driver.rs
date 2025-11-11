@@ -13,6 +13,8 @@ pub struct CompileOutput {
     pub source: String,
     /// Generated JavaScript code
     pub javascript: String,
+    /// Runtime JavaScript code (Phase 3)
+    pub runtime: String,
     // Future: markdown files, etc.
 }
 
@@ -81,11 +83,15 @@ impl Compiler {
             eprintln!("Code generation successful: {} bytes", javascript.len());
         }
 
+        // Phase 3: Include runtime code
+        let runtime = crate::runtime::get_runtime_code().to_string();
+
         // Future phases: semantic analysis, prompt extraction, etc.
         Ok(CompileOutput {
             source_file: self.options.input.clone(),
             source,
             javascript,
+            runtime,
         })
     }
 

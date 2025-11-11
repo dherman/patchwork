@@ -26,6 +26,9 @@ impl CodeGenerator {
 
     /// Generate JavaScript code for a program
     pub fn generate(&mut self, program: &Program) -> Result<String> {
+        // Phase 3: Add runtime imports
+        self.generate_runtime_imports();
+
         // For Phase 2, we only support workers (no traits, skills, imports yet)
         for item in &program.items {
             match item {
@@ -55,13 +58,22 @@ impl CodeGenerator {
         Ok(std::mem::take(&mut self.output))
     }
 
+    /// Generate runtime imports (Phase 3)
+    fn generate_runtime_imports(&mut self) {
+        // Import runtime primitives from the bundled runtime file
+        let runtime_path = crate::runtime::get_runtime_module_name();
+        self.output.push_str("// Patchwork runtime imports\n");
+        write!(self.output, "import {{ shell, SessionContext }} from '{}';\n\n", runtime_path).unwrap();
+    }
+
     /// Generate code for a worker declaration
     fn generate_worker(&mut self, worker: &WorkerDecl) -> Result<()> {
-        // Generate: export function workerName(params) { ... }
+        // Generate: export function workerName(session, params) { ... }
         // Note: Workers become exported functions for the runtime to invoke
+        // Phase 3: Workers receive a session parameter as the first argument
 
         write!(self.output, "export function {}", worker.name)?;
-        self.generate_params(&worker.params)?;
+        self.generate_worker_params(&worker.params)?;
         self.output.push_str(" {\n");
 
         self.indent += 1;
@@ -69,6 +81,21 @@ impl CodeGenerator {
         self.indent -= 1;
 
         self.output.push_str("}\n");
+        Ok(())
+    }
+
+    /// Generate parameter list for workers (includes session parameter)
+    fn generate_worker_params(&mut self, params: &[Param]) -> Result<()> {
+        self.output.push('(');
+        // Phase 3: Workers always receive session as first parameter
+        self.output.push_str("session");
+        // Add user-defined parameters
+        for param in params {
+            self.output.push_str(", ");
+            self.output.push_str(param.name);
+            // Phase 2: Ignore type annotations
+        }
+        self.output.push(')');
         Ok(())
     }
 
@@ -246,6 +273,12 @@ impl CodeGenerator {
     fn generate_expr(&mut self, expr: &Expr) -> Result<()> {
         match expr {
             Expr::Identifier(name) => {
+                // Phase 3: Bare 'self' is not supported (only self.session)
+                if *name == "self" {
+                    return Err(CompileError::Codegen(
+                        "Bare 'self' is not supported. Use self.session to access the session context".to_string()
+                    ));
+                }
                 self.output.push_str(name);
             }
             Expr::Number(n) => {
@@ -303,6 +336,20 @@ impl CodeGenerator {
                 self.output.push(')');
             }
             Expr::Member { object, field } => {
+                // Phase 3: Transform self.session -> session
+                if let Expr::Identifier("self") = **object {
+                    if *field == "session" {
+                        // self.session -> session
+                        self.output.push_str("session");
+                        return Ok(());
+                    } else {
+                        // self.something_else -> error (not supported in Phase 3)
+                        return Err(CompileError::Codegen(
+                            format!("self.{} is not supported. Only self.session is available in Phase 3", field)
+                        ));
+                    }
+                }
+                // Regular member access
                 self.generate_expr(object)?;
                 self.output.push('.');
                 self.output.push_str(field);

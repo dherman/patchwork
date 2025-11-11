@@ -1,0 +1,13 @@
+# Phase 3 Demonstration: Session Context
+#
+# This example demonstrates the new Phase 3 features:
+# 1. Runtime imports
+# 2. Session context access via self.session
+# 3. Workers receiving session as a parameter
+
+worker session_demo() {
+    var session_id = self.session.id
+    var timestamp = self.session.timestamp
+    var work_dir = self.session.dir
+    return session_id
+}

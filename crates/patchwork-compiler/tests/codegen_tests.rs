@@ -30,7 +30,8 @@ worker example() {
 "#;
 
     let js = compile_source(source).expect("compilation failed");
-    assert!(js.contains("export function example()"));
+    // Phase 3: Workers now receive session as first parameter
+    assert!(js.contains("export function example(session)"));
     assert!(js.contains("let x = 5"));
     assert!(js.contains("return x"));
 }
@@ -45,7 +46,8 @@ worker process(a, b) {
 "#;
 
     let js = compile_source(source).expect("compilation failed");
-    assert!(js.contains("export function process(a, b)"));
+    // Phase 3: Workers now receive session as first parameter
+    assert!(js.contains("export function process(session, a, b)"));
     assert!(js.contains("let sum = a + b"));
 }
 
@@ -346,9 +348,110 @@ worker example() {
     let js = compile_source(source).expect("compilation failed");
 
     // Verify all expected components
-    assert!(js.contains("export function example()"));
+    // Phase 3: Workers now receive session as first parameter
+    assert!(js.contains("export function example(session)"));
     assert!(js.contains("let x = 5"));
     assert!(js.contains("await $shell(`echo hello`, {capture: true})"));
     assert!(js.contains("if (x > 3)"));
     assert!(js.contains("await $shell(`echo x is big`)"));
+}
+
+// ====== Phase 3: Session Context Tests ======
+
+#[test]
+fn test_session_context_access() {
+    let source = r#"
+worker example() {
+    var session_id = self.session.id
+    var timestamp = self.session.timestamp
+    var work_dir = self.session.dir
+    return session_id
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Check runtime imports are included (Phase 3: bundled runtime)
+    assert!(js.contains("import { shell, SessionContext } from './patchwork-runtime.js'"));
+
+    // Check worker receives session parameter
+    assert!(js.contains("export function example(session)"));
+
+    // Check self.session.x is transformed to session.x
+    assert!(js.contains("let session_id = session.id"));
+    assert!(js.contains("let timestamp = session.timestamp"));
+    assert!(js.contains("let work_dir = session.dir"));
+}
+
+#[test]
+fn test_session_in_string_interpolation() {
+    let source = r#"
+worker example() {
+    var msg = "Session ${self.session.id} at ${self.session.dir}"
+    return msg
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Check session access in template literals
+    assert!(js.contains("let msg = `Session ${session.id} at ${session.dir}`"));
+}
+
+#[test]
+fn test_bare_self_error() {
+    let source = r#"
+worker example() {
+    return self
+}
+"#;
+
+    let result = compile_source(source);
+    assert!(result.is_err(), "Expected error for bare 'self'");
+    let err = result.unwrap_err();
+    assert!(err.contains("Bare 'self' is not supported"),
+            "Error message should mention 'Bare self', got: {}", err);
+}
+
+#[test]
+fn test_invalid_self_field_error() {
+    let source = r#"
+worker example() {
+    return self.mailbox
+}
+"#;
+
+    let result = compile_source(source);
+    assert!(result.is_err(), "Expected error for self.mailbox in Phase 3");
+    let err = result.unwrap_err();
+    assert!(err.contains("self.mailbox is not supported") || err.contains("Only self.session"),
+            "Error message should mention unsupported field, got: {}", err);
+}
+
+#[test]
+fn test_runtime_emission() {
+    let source = r#"
+worker example() {
+    return 42
+}
+"#;
+
+    // Compile source (need full CompileOutput, not just javascript)
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join(format!("test_{}.pw", rand::random::<u32>()));
+    std::fs::write(&test_file, source).expect("Failed to write test file");
+
+    let options = CompileOptions::new(&test_file);
+    let compiler = Compiler::new(options);
+    let output = compiler.compile().expect("compilation failed");
+
+    // Clean up
+    let _ = std::fs::remove_file(&test_file);
+
+    // Verify runtime code is included
+    assert!(!output.runtime.is_empty(), "Runtime code should not be empty");
+    assert!(output.runtime.contains("export async function shell"),
+            "Runtime should contain shell function");
+    assert!(output.runtime.contains("export class SessionContext"),
+            "Runtime should contain SessionContext class");
 }
