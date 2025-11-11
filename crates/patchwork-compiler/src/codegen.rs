@@ -5,6 +5,7 @@
 
 use patchwork_parser::ast::*;
 use crate::error::{CompileError, Result};
+use crate::prompts::{PromptTemplate, PromptKind, extract_prompt_template};
 use std::fmt::Write as _;
 
 /// JavaScript code generator
@@ -13,6 +14,10 @@ pub struct CodeGenerator {
     indent: usize,
     /// Output buffer
     output: String,
+    /// Prompt templates extracted during compilation
+    prompts: Vec<PromptTemplate>,
+    /// Counter for generating unique prompt IDs
+    prompt_counter: usize,
 }
 
 impl CodeGenerator {
@@ -21,7 +26,14 @@ impl CodeGenerator {
         Self {
             indent: 0,
             output: String::new(),
+            prompts: Vec::new(),
+            prompt_counter: 0,
         }
+    }
+
+    /// Get the extracted prompt templates
+    pub fn prompts(&self) -> &[PromptTemplate] {
+        &self.prompts
     }
 
     /// Generate JavaScript code for a program
@@ -63,7 +75,7 @@ impl CodeGenerator {
         // Import runtime primitives from the bundled runtime file
         let runtime_path = crate::runtime::get_runtime_module_name();
         self.output.push_str("// Patchwork runtime imports\n");
-        write!(self.output, "import {{ shell, SessionContext }} from '{}';\n\n", runtime_path).unwrap();
+        write!(self.output, "import {{ shell, SessionContext, executePrompt }} from '{}';\n\n", runtime_path).unwrap();
     }
 
     /// Generate code for a worker declaration
@@ -397,9 +409,11 @@ impl CodeGenerator {
             Expr::ShellRedirect { command, op, target } => {
                 self.generate_shell_redirect(command, op, target)?;
             }
-            Expr::Think(_) | Expr::Ask(_) => {
-                // Phase 2: Skip prompt blocks (Phase 4)
-                return Err(CompileError::Unsupported("Prompt blocks not yet supported in Phase 2".into()));
+            Expr::Think(block) => {
+                self.generate_prompt_expr(block, PromptKind::Think)?;
+            }
+            Expr::Ask(block) => {
+                self.generate_prompt_expr(block, PromptKind::Ask)?;
             }
             Expr::Do(_) => {
                 // Phase 2: Skip do expressions
@@ -653,6 +667,40 @@ impl CodeGenerator {
         for _ in 0..self.indent {
             self.output.push_str("  ");
         }
+    }
+
+    /// Generate code for a prompt expression (think/ask)
+    fn generate_prompt_expr(&mut self, block: &PromptBlock, kind: PromptKind) -> Result<()> {
+        // Generate a unique ID for this prompt
+        let id = format!("{}_{}", kind.as_str(), self.prompt_counter);
+        self.prompt_counter += 1;
+
+        // Extract the prompt template
+        let template = extract_prompt_template(block, kind, id.clone())?;
+
+        // Generate the IPC call:
+        // await executePrompt(session, 'think_0', { name: name, description: description })
+        self.output.push_str("await executePrompt(session, '");
+        self.output.push_str(&template.id);
+        self.output.push_str("', { ");
+
+        // Generate the bindings object
+        let mut first = true;
+        for binding in &template.required_bindings {
+            if !first {
+                self.output.push_str(", ");
+            }
+            first = false;
+            // binding: binding (or just use shorthand syntax)
+            self.output.push_str(binding);
+        }
+
+        self.output.push_str(" })");
+
+        // Store the template for later markdown generation
+        self.prompts.push(template);
+
+        Ok(())
     }
 }
 

@@ -1,41 +1,44 @@
 {
-  "current_phase": "Phase 3 Complete - Session Context and Runtime Primitives",
+  "current_phase": "Phase 4 Complete - Prompt Block Compilation",
   "recent_accomplishments": [
-    "Implemented JavaScript runtime bundled with compiler",
-    "Fixed initial mistake of creating Rust runtime instead of JavaScript",
-    "Added session context access (self.session.{id, timestamp, dir})",
-    "Workers now receive session parameter as first argument",
-    "All 212 tests passing across 10 test suites",
-    "Runtime provides shell execution, SessionContext class, and IPC scaffolding"
+    "Created prompts.rs module for prompt template extraction",
+    "Implemented markdown generation with variable interpolation",
+    "Added executePrompt() to runtime for IPC coordination",
+    "Updated CodeGenerator to track and generate prompt blocks",
+    "Modified CompileOutput to include prompts HashMap",
+    "Added 9 new Phase 4 tests (all 222 tests passing)",
+    "Created phase4-prompt-demo.pw example",
+    "Updated compiler-implementation-plan.md with Phase 4 completion"
   ],
-  "key_architecture_decisions": {
-    "runtime_approach": "JavaScript bundled with compiler (embedded via include_str!)",
-    "rationale": "Generated code runs in Node.js, bundling simplifies distribution",
-    "can_extract_later": "Can become separate npm package if needed"
+  "key_architecture": {
+    "prompt_extraction": "PromptBlock AST → markdown with ${placeholders}",
+    "variable_binding": "Recursively extract variable refs, bind root objects for member access",
+    "code_generation": "await executePrompt(session, 'think_0', { bindings })",
+    "prompt_ids": "Shared counter across types: think_0, ask_1, think_2"
   },
   "implementation_details": {
-    "runtime_location": "crates/patchwork-compiler/src/runtime.js",
-    "runtime_size": "~120 lines of JavaScript",
-    "import_path": "./patchwork-runtime.js",
-    "session_transform": "self.session.x → session.x in generated code"
+    "new_module": "crates/patchwork-compiler/src/prompts.rs",
+    "runtime_function": "executePrompt() - mock impl, Phase 11 will add real IPC",
+    "compile_output": "Added prompts: HashMap<String, String> field",
+    "test_count": "222 total, 35 codegen (9 new for Phase 4)"
   },
-  "test_status": {
-    "total_tests": 212,
-    "test_suites": 10,
-    "new_tests": 5,
-    "all_passing": true
+  "example": {
+    "file": "examples/phase4-prompt-demo.pw",
+    "workers": 2,
+    "prompts": 5,
+    "demonstrates": "think/ask with variable interpolation"
   },
-  "next_phase": "Phase 4: Prompt Block Compilation",
+  "next_phase": "Phase 5: Message Passing Between Workers",
   "files_to_commit": [
-    "crates/patchwork-compiler/src/runtime.rs",
-    "crates/patchwork-compiler/src/runtime.js",
+    "crates/patchwork-compiler/src/prompts.rs",
     "crates/patchwork-compiler/src/lib.rs",
-    "crates/patchwork-compiler/src/driver.rs",
     "crates/patchwork-compiler/src/codegen.rs",
+    "crates/patchwork-compiler/src/driver.rs",
+    "crates/patchwork-compiler/src/runtime.js",
     "crates/patchwork-compiler/src/bin/patchworkc.rs",
     "crates/patchwork-compiler/tests/codegen_tests.rs",
-    "examples/phase3-session-demo.pw",
-    "docs/phase3-completion-summary.md",
+    "examples/phase4-prompt-demo.pw",
+    "docs/phase4-completion-summary.md",
     "docs/compiler-implementation-plan.md"
   ]
 }

@@ -1,9 +1,11 @@
 /// Compiler driver that orchestrates the compilation pipeline
 
 use std::path::PathBuf;
+use std::collections::HashMap;
 use patchwork_parser::ast::Program;
 use crate::error::{CompileError, Result};
 use crate::codegen::CodeGenerator;
+use crate::prompts::PromptTemplate;
 
 /// Compilation output structure
 pub struct CompileOutput {
@@ -15,7 +17,9 @@ pub struct CompileOutput {
     pub javascript: String,
     /// Runtime JavaScript code (Phase 3)
     pub runtime: String,
-    // Future: markdown files, etc.
+    /// Prompt templates extracted during compilation (Phase 4)
+    /// Map from template ID to markdown content
+    pub prompts: HashMap<String, String>,
 }
 
 /// Options for compilation
@@ -77,21 +81,27 @@ impl Compiler {
         }
 
         // Phase 2: Generate JavaScript code
-        let javascript = self.generate_code(&ast)?;
+        let (javascript, prompt_templates) = self.generate_code(&ast)?;
 
         if self.options.verbose {
             eprintln!("Code generation successful: {} bytes", javascript.len());
+            eprintln!("Extracted {} prompt templates", prompt_templates.len());
         }
 
         // Phase 3: Include runtime code
         let runtime = crate::runtime::get_runtime_code().to_string();
 
-        // Future phases: semantic analysis, prompt extraction, etc.
+        // Phase 4: Convert prompt templates to markdown map
+        let prompts = prompt_templates.into_iter()
+            .map(|t| (t.id.clone(), t.markdown.clone()))
+            .collect();
+
         Ok(CompileOutput {
             source_file: self.options.input.clone(),
             source,
             javascript,
             runtime,
+            prompts,
         })
     }
 
@@ -111,10 +121,12 @@ impl Compiler {
             .map_err(|e| CompileError::parse(&self.options.input, e.to_string()))
     }
 
-    /// Generate JavaScript code from AST
-    fn generate_code(&self, ast: &Program) -> Result<String> {
+    /// Generate JavaScript code from AST and extract prompt templates
+    fn generate_code(&self, ast: &Program) -> Result<(String, Vec<PromptTemplate>)> {
         let mut generator = CodeGenerator::new();
-        generator.generate(ast)
+        let javascript = generator.generate(ast)?;
+        let prompts = generator.prompts().to_vec();
+        Ok((javascript, prompts))
     }
 
     /// Get the output directory (creates if needed)

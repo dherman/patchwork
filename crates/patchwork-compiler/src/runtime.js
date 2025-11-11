@@ -120,3 +120,30 @@ export class AskResponse extends IpcMessage {
     super('AskResponse', { result });
   }
 }
+
+/**
+ * Execute a prompt block (think or ask)
+ *
+ * Phase 4: Sends IPC request with template ID and variable bindings.
+ * Phase 11: Full IPC implementation with actual agent communication.
+ *
+ * @param {SessionContext} session - The session context
+ * @param {string} templateId - The prompt template ID (e.g., 'think_0')
+ * @param {Object} bindings - Variable bindings to interpolate into the template
+ * @returns {Promise<any>} - The result from the agent (structure depends on prompt type)
+ */
+export async function executePrompt(session, templateId, bindings) {
+  // Phase 4: Mock implementation that just returns a placeholder
+  // Phase 11 will implement the full IPC transport
+
+  console.log(`[Patchwork Runtime] executePrompt: ${templateId}`);
+  console.log(`[Patchwork Runtime] Session: ${session.id}`);
+  console.log(`[Patchwork Runtime] Bindings:`, bindings);
+
+  // Return a mock response for now
+  // In Phase 11, this will send an IPC message and await the response
+  return {
+    success: true,
+    message: `Mock response for ${templateId}`,
+  };
+}

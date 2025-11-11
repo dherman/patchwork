@@ -82,18 +82,18 @@ export function example() {
 
 **Completion details**: See [phase3-completion-summary.md](phase3-completion-summary.md)
 
-## Phase 4: Prompt Block Compilation
+## Phase 4: Prompt Block Compilation ✅
 
 **Goal**: Compile `think { }` and `ask { }` blocks to markdown files and generate the runtime coordination code.
 
 **Additions**:
-- [ ] Parse prompt block contents as markdown
-- [ ] Extract variable references via lexical analysis
-- [ ] Generate markdown template files
-- [ ] Generate JS code that sends IPC requests with variable bindings
-- [ ] Implement the blocking behavior (await IPC response)
+- [x] Parse prompt block contents as markdown
+- [x] Extract variable references via lexical analysis
+- [x] Generate markdown template files
+- [x] Generate JS code that sends IPC requests with variable bindings
+- [x] Implement the blocking behavior (await IPC response)
 
-**Success criteria**: A worker with a `think { }` block compiles to JS + markdown, and the JS code properly captures variables and sends them via IPC.
+**Success criteria**: A worker with a `think { }` block compiles to JS + markdown, and the JS code properly captures variables and sends them via IPC. ✅
 
 **Example input**:
 ```patchwork
@@ -106,6 +106,8 @@ worker example() {
 ```
 
 **Deferred**: Actual IPC transport implementation (can mock for testing).
+
+**Completion details**: See [phase4-completion-summary.md](phase4-completion-summary.md)
 
 ## Phase 5: Message Passing Between Workers
 

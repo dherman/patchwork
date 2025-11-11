@@ -371,8 +371,8 @@ worker example() {
 
     let js = compile_source(source).expect("compilation failed");
 
-    // Check runtime imports are included (Phase 3: bundled runtime)
-    assert!(js.contains("import { shell, SessionContext } from './patchwork-runtime.js'"));
+    // Check runtime imports are included (Phase 4: includes executePrompt)
+    assert!(js.contains("import { shell, SessionContext, executePrompt } from './patchwork-runtime.js'"));
 
     // Check worker receives session parameter
     assert!(js.contains("export function example(session)"));
@@ -454,4 +454,181 @@ worker example() {
             "Runtime should contain shell function");
     assert!(output.runtime.contains("export class SessionContext"),
             "Runtime should contain SessionContext class");
+}
+
+// ========================================
+// Phase 4: Prompt Block Compilation Tests
+// ========================================
+
+/// Helper to compile and return both JS and prompts
+fn compile_with_prompts(source: &str) -> Result<(String, std::collections::HashMap<String, String>), String> {
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join(format!("test_{}.pw", rand::random::<u32>()));
+    std::fs::write(&test_file, source).map_err(|e| e.to_string())?;
+
+    let options = CompileOptions::new(&test_file);
+    let compiler = Compiler::new(options);
+    let output = compiler.compile().map_err(|e| e.to_string())?;
+
+    let _ = std::fs::remove_file(&test_file);
+
+    Ok((output.javascript, output.prompts))
+}
+
+#[test]
+fn test_simple_think_block() {
+    let source = r#"
+worker example() {
+    var result = think {
+        Hello, world!
+    }
+}
+"#;
+
+    let (js, prompts) = compile_with_prompts(source).expect("compilation failed");
+
+    // Verify JS contains executePrompt call
+    assert!(js.contains("await executePrompt(session, 'think_0', {  })"),
+            "JS should contain executePrompt call for think_0");
+
+    // Verify prompt template was extracted
+    assert_eq!(prompts.len(), 1, "Should have 1 prompt template");
+    assert!(prompts.contains_key("think_0"), "Should have think_0 template");
+
+    let markdown = &prompts["think_0"];
+    assert!(markdown.contains("Hello, world!"), "Markdown should contain the prompt text");
+}
+
+#[test]
+fn test_think_block_with_variable() {
+    let source = r#"
+worker example() {
+    var name = "Claude"
+    var result = think {
+        Say hello to ${name}.
+    }
+}
+"#;
+
+    let (js, prompts) = compile_with_prompts(source).expect("compilation failed");
+
+    // Verify JS passes variable binding
+    assert!(js.contains("await executePrompt(session, 'think_0', { name })"),
+            "JS should pass name binding to executePrompt");
+
+    // Verify prompt template has placeholder
+    let markdown = &prompts["think_0"];
+    assert!(markdown.contains("Say hello to") && markdown.contains("${name}"),
+            "Markdown should preserve variable placeholder. Got: {}", markdown);
+}
+
+#[test]
+fn test_multiple_variables_in_prompt() {
+    let source = r#"
+worker example() {
+    var description = "Add OAuth support"
+    var build_cmd = "cargo check"
+    var result = think {
+        The user wants to ${description}.
+        Use ${build_cmd} to validate the build.
+    }
+}
+"#;
+
+    let (js, prompts) = compile_with_prompts(source).expect("compilation failed");
+
+    // Verify both variables are bound (order may vary due to HashSet)
+    assert!(js.contains("description") && js.contains("build_cmd"),
+            "JS should bind both description and build_cmd");
+
+    let markdown = &prompts["think_0"];
+    assert!(markdown.contains("description"), "Markdown should have description placeholder");
+    assert!(markdown.contains("build_cmd"), "Markdown should have build_cmd placeholder");
+}
+
+#[test]
+fn test_ask_block() {
+    let source = r#"
+worker example() {
+    var response = ask {
+        What would you like to do?
+    }
+}
+"#;
+
+    let (js, prompts) = compile_with_prompts(source).expect("compilation failed");
+
+    // Verify ask block generates ask_0
+    assert!(js.contains("await executePrompt(session, 'ask_0', {  })"),
+            "JS should contain executePrompt call for ask_0");
+
+    assert!(prompts.contains_key("ask_0"), "Should have ask_0 template");
+}
+
+#[test]
+fn test_multiple_prompt_blocks() {
+    let source = r#"
+worker example() {
+    var x = think { First prompt }
+    var y = ask { Second prompt }
+    var z = think { Third prompt }
+}
+"#;
+
+    let (js, prompts) = compile_with_prompts(source).expect("compilation failed");
+
+    // Verify unique IDs for each prompt (counter is shared across types)
+    assert!(js.contains("'think_0'"), "Should have think_0");
+    assert!(js.contains("'ask_1'"), "Should have ask_1");
+    assert!(js.contains("'think_2'"), "Should have think_2");
+
+    assert_eq!(prompts.len(), 3, "Should have 3 prompt templates");
+    assert!(prompts.contains_key("think_0"));
+    assert!(prompts.contains_key("ask_1"));
+    assert!(prompts.contains_key("think_2"));
+}
+
+#[test]
+fn test_prompt_with_member_access() {
+    let source = r#"
+worker example() {
+    var user = "data"
+    var result = think {
+        User name: ${user.name}
+    }
+}
+"#;
+
+    let (js, prompts) = compile_with_prompts(source).expect("compilation failed");
+
+    // Should bind the root object "user", not "name"
+    assert!(js.contains("{ user }"), "JS should bind user object");
+
+    let markdown = &prompts["think_0"];
+    assert!(markdown.contains("user.name"), "Markdown should preserve member access");
+}
+
+#[test]
+fn test_runtime_has_execute_prompt() {
+    let source = r#"
+worker example() {
+    var x = think { test }
+}
+"#;
+
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join(format!("test_{}.pw", rand::random::<u32>()));
+    std::fs::write(&test_file, source).expect("failed to write test file");
+
+    let options = CompileOptions::new(&test_file);
+    let compiler = Compiler::new(options);
+    let output = compiler.compile().expect("compilation failed");
+
+    let _ = std::fs::remove_file(&test_file);
+
+    // Verify runtime includes executePrompt function
+    assert!(output.runtime.contains("export async function executePrompt"),
+            "Runtime should export executePrompt function");
+    assert!(output.javascript.contains("import { shell, SessionContext, executePrompt }"),
+            "Generated code should import executePrompt");
 }

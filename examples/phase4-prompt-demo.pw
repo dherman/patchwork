@@ -1,0 +1,48 @@
+worker code_review_assistant() {
+    var task_description = "Add OAuth support to the login system"
+    var build_command = "cargo check --all-targets"
+
+    var analysis = think {
+        The user wants to: ${task_description}
+
+        Please analyze this task and provide:
+        1. What files likely need to be modified
+        2. What dependencies might be needed
+        3. Potential security considerations
+
+        After analysis, use ${build_command} to verify the build.
+    }
+
+    var next_action = ask {
+        Based on the analysis, what would you like to do next?
+
+        Options:
+        1. Start implementing the changes
+        2. Create a design document first
+        3. Research OAuth providers
+    }
+
+    var implementation_plan = think {
+        Create an implementation plan for: ${task_description}
+
+        User selected: ${next_action}
+
+        Break down the work into concrete steps.
+    }
+
+    return implementation_plan
+}
+
+worker simple_greeting() {
+    var user_name = "David"
+
+    var greeting = think {
+        Say hello to ${user_name} and ask how you can help today.
+    }
+
+    var user_request = ask {
+        What would you like to work on?
+    }
+
+    return user_request
+}
