@@ -24,17 +24,17 @@ This plan prioritizes **getting to a working compilation as quickly as possible*
 
 **Deferred**: Code generation, semantic analysis, type checking.
 
-## Phase 2: Simple Worker Codegen (Code Mode Only)
+## Phase 2: Simple Worker Codegen (Code Mode Only) ✅
 
 **Goal**: Compile a single worker with only code mode features to executable JavaScript.
 
 **Subset of language**:
-- [ ] Variable declarations and assignments
-- [ ] Basic expressions (arithmetic, string concatenation, member access)
-- [ ] Function calls
-- [ ] Control flow (if, while, for)
-- [ ] Shell commands (both statement and expression forms)
-- [ ] Return statements
+- [x] Variable declarations and assignments
+- [x] Basic expressions (arithmetic, string concatenation, member access)
+- [x] Function calls
+- [x] Control flow (if, while, for)
+- [x] Shell commands (both statement and expression forms)
+- [x] Return statements
 
 **Explicitly excluded** (for now):
 - Prompt blocks (`think { }`, `ask { }`)
@@ -43,7 +43,7 @@ This plan prioritizes **getting to a working compilation as quickly as possible*
 - Type annotations (parse but ignore)
 - Imports/exports
 
-**Success criteria**: A simple worker with variables, conditionals, and shell commands compiles to runnable JS that executes correctly.
+**Success criteria**: A simple worker with variables, conditionals, and shell commands compiles to runnable JS that executes correctly. ✅
 
 **Example input**:
 ```patchwork
@@ -53,6 +53,17 @@ worker example() {
     if x > 3 {
         $ echo "x is big"
     }
+}
+```
+
+**Generated output**:
+```javascript
+export function example() {
+  let x = 5;
+  let y = await $shell(`echo hello`, {capture: true});
+  if (x > 3) {
+    await $shell(`echo x is big`);
+  }
 }
 ```
 

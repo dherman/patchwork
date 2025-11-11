@@ -45,12 +45,18 @@ fn main() {
     match compiler.compile() {
         Ok(output) => {
             if args.dump_ast {
-                println!("AST for {}:", output.source_file.display());
-                println!("{:#?}", output.ast);
-            } else if args.verbose {
-                println!("Compilation successful!");
-                println!("  Source: {}", output.source_file.display());
-                println!("  Items: {}", output.ast.items.len());
+                // For Phase 2, we skip AST dump (no easy way to re-parse)
+                // In future we could store the AST in the output
+                eprintln!("AST dump not available in Phase 2");
+            } else {
+                // Write the generated JavaScript to stdout or file
+                if args.verbose {
+                    println!("Compilation successful!");
+                    println!("  Source: {}", output.source_file.display());
+                    println!("  Generated {} bytes of JavaScript", output.javascript.len());
+                    println!("\nGenerated code:");
+                }
+                println!("{}", output.javascript);
             }
         }
         Err(e) => {

@@ -1,0 +1,7 @@
+worker example() {
+    var x = 5
+    var y = $(echo "hello")
+    if x > 3 {
+        $ echo "x is big"
+    }
+}

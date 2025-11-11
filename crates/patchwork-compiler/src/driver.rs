@@ -3,15 +3,17 @@
 use std::path::PathBuf;
 use patchwork_parser::ast::Program;
 use crate::error::{CompileError, Result};
+use crate::codegen::CodeGenerator;
 
 /// Compilation output structure
-#[derive(Debug)]
 pub struct CompileOutput {
     /// Source file that was compiled
     pub source_file: PathBuf,
-    /// Parsed AST
-    pub ast: Program<'static>,
-    // Future: generated JS, markdown files, etc.
+    /// Source code (kept alive for AST references)
+    pub source: String,
+    /// Generated JavaScript code
+    pub javascript: String,
+    // Future: markdown files, etc.
 }
 
 /// Options for compilation
@@ -72,11 +74,18 @@ impl Compiler {
             eprintln!("Parse successful: {} items", ast.items.len());
         }
 
-        // For Phase 1, we just return the AST
-        // Future phases will add semantic analysis, codegen, etc.
+        // Phase 2: Generate JavaScript code
+        let javascript = self.generate_code(&ast)?;
+
+        if self.options.verbose {
+            eprintln!("Code generation successful: {} bytes", javascript.len());
+        }
+
+        // Future phases: semantic analysis, prompt extraction, etc.
         Ok(CompileOutput {
             source_file: self.options.input.clone(),
-            ast,
+            source,
+            javascript,
         })
     }
 
@@ -90,14 +99,16 @@ impl Compiler {
     }
 
     /// Parse source code into AST
-    fn parse(&self, _source: &str) -> Result<Program<'static>> {
+    fn parse<'a>(&self, source: &'a str) -> Result<Program<'a>> {
         // Use patchwork_parser to parse the source
-        // For now, we'll use a simplified approach
-        // TODO: Integrate with actual parser
+        patchwork_parser::parse(source)
+            .map_err(|e| CompileError::parse(&self.options.input, e.to_string()))
+    }
 
-        // Placeholder - will integrate with patchwork-parser
-        // For now, return an empty program to satisfy the type system
-        Ok(Program { items: vec![] })
+    /// Generate JavaScript code from AST
+    fn generate_code(&self, ast: &Program) -> Result<String> {
+        let mut generator = CodeGenerator::new();
+        generator.generate(ast)
     }
 
     /// Get the output directory (creates if needed)

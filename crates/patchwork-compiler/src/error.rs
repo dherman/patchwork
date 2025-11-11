@@ -24,6 +24,12 @@ pub enum CompileError {
 
     #[error("Multiple errors occurred:\n{}", .0.iter().map(|e| format!("  - {}", e)).collect::<Vec<_>>().join("\n"))]
     Multiple(Vec<CompileError>),
+
+    #[error("Unsupported feature: {0}")]
+    Unsupported(String),
+
+    #[error("Formatting error: {0}")]
+    Fmt(#[from] std::fmt::Error),
 }
 
 impl CompileError {

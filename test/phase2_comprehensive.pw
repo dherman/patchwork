@@ -1,0 +1,44 @@
+worker complex_example(input) {
+    var x = 10
+    var y = 20
+    var name = "world"
+    var enabled = true
+
+    var sum = x + y
+    var product = x * y
+
+    var greeting = "Hello, ${name}!"
+
+    if sum > 25 {
+        $ echo "Sum is large"
+    } else {
+        $ echo "Sum is small"
+    }
+
+    var counter = 0
+    while counter < 3 {
+        counter = counter + 1
+    }
+
+    var items = [1, 2, 3]
+    for var item in items {
+        $ echo "Item: ${item}"
+    }
+
+    var result = process(x, y)
+
+    $ mkdir -p work_dir
+    var files = $(ls)
+
+    $ echo "test" | grep test
+    $ touch file.txt && cat file.txt
+
+    var obj = {a: 1, b: 2}
+    var val = obj.a
+
+    return result
+}
+
+fun process(a, b) {
+    return a + b
+}

@@ -5,6 +5,8 @@
 
 pub mod driver;
 pub mod error;
+pub mod codegen;
 
 pub use driver::{Compiler, CompileOptions, CompileOutput};
 pub use error::{CompileError, Result};
+pub use codegen::CodeGenerator;
