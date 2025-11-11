@@ -1,0 +1,271 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Patchwork",
+  "scopeName": "source.patchwork",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#keywords" },
+    { "include": "#shell-statement" },
+    { "include": "#shell-expression" },
+    { "include": "#strings" },
+    { "include": "#think-block" },
+    { "include": "#functions" },
+    { "include": "#types" },
+    { "include": "#operators" },
+    { "include": "#numbers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.patchwork",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.patchwork",
+          "match": "\\b(if|else|for|while|do|break|continue|return|throw|in)\\b"
+        },
+        {
+          "name": "keyword.other.patchwork",
+          "match": "\\b(import|export|default|worker|trait|fun|var|type|delegate|await)\\b"
+        },
+        {
+          "name": "storage.modifier.patchwork",
+          "match": "\\b(public|private|async)\\b"
+        },
+        {
+          "name": "constant.language.patchwork",
+          "match": "\\b(true|false|null|undefined|self)\\b"
+        }
+      ]
+    },
+    "shell-statement": {
+      "patterns": [
+        {
+          "name": "meta.embedded.shell.patchwork",
+          "begin": "^\\s*(\\$)\\s+",
+          "end": "$",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.shell.patchwork" }
+          },
+          "patterns": [
+            { "include": "#shell-content" }
+          ]
+        }
+      ]
+    },
+    "shell-expression": {
+      "patterns": [
+        {
+          "name": "variable.language.shell.exitcode.patchwork",
+          "match": "\\$\\?"
+        },
+        {
+          "name": "meta.embedded.shell.expression.patchwork",
+          "begin": "\\$\\(",
+          "end": "\\)",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.shell.begin.patchwork" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.shell.end.patchwork" }
+          },
+          "patterns": [
+            { "include": "#shell-content" }
+          ]
+        }
+      ]
+    },
+    "shell-content": {
+      "patterns": [
+        {
+          "name": "support.function.shell.patchwork",
+          "match": "\\b(git|mkdir|echo|cd|ls|cat|grep|sed|awk|npm|cargo|rustc)\\b"
+        },
+        {
+          "name": "string.unquoted.shell.patchwork",
+          "match": "[^\\s\\)\\(]+"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.patchwork",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.patchwork",
+              "match": "\\\\."
+            },
+            { "include": "#string-interpolation" }
+          ]
+        },
+        {
+          "name": "string.quoted.single.patchwork",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.patchwork",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "string-interpolation": {
+      "patterns": [
+        {
+          "name": "meta.interpolation.patchwork",
+          "begin": "\\$\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.interpolation.begin.patchwork" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.interpolation.end.patchwork" }
+          },
+          "patterns": [
+            { "include": "$self" }
+          ]
+        }
+      ]
+    },
+    "think-block": {
+      "patterns": [
+        {
+          "name": "meta.think.patchwork",
+          "contentName": "text.html.markdown.embedded.patchwork",
+          "begin": "\\b(think|ask)\\s*\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.prompt.patchwork" }
+          },
+          "patterns": [
+            { "include": "#string-interpolation" },
+            { "include": "#markdown-content" }
+          ]
+        }
+      ]
+    },
+    "markdown-content": {
+      "patterns": [
+        {
+          "name": "markup.bold.markdown",
+          "match": "\\*\\*([^*]+)\\*\\*",
+          "captures": {
+            "0": { "name": "markup.bold.markdown" }
+          }
+        },
+        {
+          "name": "markup.italic.markdown",
+          "match": "\\*([^*]+)\\*",
+          "captures": {
+            "0": { "name": "markup.italic.markdown" }
+          }
+        },
+        {
+          "name": "markup.inline.raw.markdown",
+          "match": "`[^`]+`"
+        },
+        {
+          "name": "markup.heading.markdown",
+          "match": "^\\s*#{1,6}\\s+.*$"
+        },
+        {
+          "name": "markup.list.markdown",
+          "match": "^\\s*[-*+]\\s+"
+        },
+        {
+          "name": "markup.list.numbered.markdown",
+          "match": "^\\s*\\d+\\.\\s+"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "name": "meta.function.patchwork",
+          "match": "\\b(fun)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.patchwork" },
+            "2": { "name": "entity.name.function.patchwork" }
+          }
+        },
+        {
+          "name": "meta.worker.patchwork",
+          "match": "\\b(worker)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.patchwork" },
+            "2": { "name": "entity.name.function.worker.patchwork" }
+          }
+        },
+        {
+          "name": "support.function.delegate.patchwork",
+          "match": "\\.delegate\\b"
+        },
+        {
+          "name": "keyword.control.await.patchwork",
+          "match": "\\.await\\b"
+        },
+        {
+          "name": "entity.name.function.call.patchwork",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "meta.type.definition.patchwork",
+          "match": "\\b(type)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.patchwork" },
+            "2": { "name": "entity.name.type.patchwork" }
+          }
+        },
+        {
+          "name": "meta.trait.definition.patchwork",
+          "match": "\\b(trait)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.other.patchwork" },
+            "2": { "name": "entity.name.type.trait.patchwork" }
+          }
+        },
+        {
+          "name": "storage.type.patchwork",
+          "match": ":\\s*([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "entity.name.type.patchwork" }
+          }
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.patchwork",
+          "match": "(\\+|\\-|\\*|\\/|%|=|==|!=|<|>|<=|>=|&&|\\|\\||!|\\.)"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "keyword.operator.range.patchwork",
+          "match": "\\.\\.\\."
+        },
+        {
+          "name": "constant.numeric.patchwork",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    }
+  }
+}

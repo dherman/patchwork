@@ -1,0 +1,33 @@
+{
+  "name": "patchwork-vscode",
+  "displayName": "Patchwork Language Support",
+  "description": "Syntax highlighting and language support for Patchwork (.pw files)",
+  "version": "0.0.1",
+  "publisher": "dherman",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "patchwork",
+        "aliases": ["Patchwork", "patchwork"],
+        "extensions": [".pw"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "patchwork",
+        "scopeName": "source.patchwork",
+        "path": "./syntaxes/patchwork.tmLanguage.json",
+        "embeddedLanguages": {
+          "text.html.markdown.embedded.patchwork": "markdown"
+        }
+      }
+    ]
+  }
+}
