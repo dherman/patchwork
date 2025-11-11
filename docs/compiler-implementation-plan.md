@@ -10,15 +10,15 @@ This plan prioritizes **getting to a working compilation as quickly as possible*
 - Focus on codegen before optimization
 - Test each layer before adding the next
 
-## Phase 1: Core Infrastructure
+## Phase 1: Core Infrastructure ✅
 
 **Goal**: Set up the compiler pipeline structure without worrying about completeness.
 
 **Deliverables**:
-- Compiler driver that orchestrates compilation phases
-- AST representation (already have from parser)
-- Basic error reporting infrastructure
-- Command-line interface for invoking the compiler
+- [x] Compiler driver that orchestrates compilation phases
+- [x] AST representation (already have from parser)
+- [x] Basic error reporting infrastructure
+- [x] Command-line interface for invoking the compiler
 
 **Success criteria**: Can invoke the compiler on a Patchwork file and get structured output (even if it's just a debug dump).
 
@@ -29,12 +29,12 @@ This plan prioritizes **getting to a working compilation as quickly as possible*
 **Goal**: Compile a single worker with only code mode features to executable JavaScript.
 
 **Subset of language**:
-- Variable declarations and assignments
-- Basic expressions (arithmetic, string concatenation, member access)
-- Function calls
-- Control flow (if, while, for)
-- Shell commands (both statement and expression forms)
-- Return statements
+- [ ] Variable declarations and assignments
+- [ ] Basic expressions (arithmetic, string concatenation, member access)
+- [ ] Function calls
+- [ ] Control flow (if, while, for)
+- [ ] Shell commands (both statement and expression forms)
+- [ ] Return statements
 
 **Explicitly excluded** (for now):
 - Prompt blocks (`think { }`, `ask { }`)
@@ -61,9 +61,9 @@ worker example() {
 **Goal**: Add the runtime infrastructure that workers need to interact with their environment.
 
 **Additions**:
-- `self.session.{id, timestamp, dir}` context object
-- Runtime library with session management
-- IPC protocol scaffolding (even if not fully functional yet)
+- [ ] `self.session.{id, timestamp, dir}` context object
+- [ ] Runtime library with session management
+- [ ] IPC protocol scaffolding (even if not fully functional yet)
 
 **Success criteria**: Workers can access session context and the generated code includes proper runtime imports.
 
@@ -74,11 +74,11 @@ worker example() {
 **Goal**: Compile `think { }` and `ask { }` blocks to markdown files and generate the runtime coordination code.
 
 **Additions**:
-- Parse prompt block contents as markdown
-- Extract variable references via lexical analysis
-- Generate markdown template files
-- Generate JS code that sends IPC requests with variable bindings
-- Implement the blocking behavior (await IPC response)
+- [ ] Parse prompt block contents as markdown
+- [ ] Extract variable references via lexical analysis
+- [ ] Generate markdown template files
+- [ ] Generate JS code that sends IPC requests with variable bindings
+- [ ] Implement the blocking behavior (await IPC response)
 
 **Success criteria**: A worker with a `think { }` block compiles to JS + markdown, and the JS code properly captures variables and sends them via IPC.
 
@@ -99,10 +99,10 @@ worker example() {
 **Goal**: Enable workers to communicate via mailboxes.
 
 **Additions**:
-- Mailbox access via `self.session.mailbox.{name}`
-- `send()` and `receive()` method compilation
-- Message serialization/deserialization
-- Mailroom infrastructure in the runtime
+- [ ] Mailbox access via `self.session.mailbox.{name}`
+- [ ] `send()` and `receive()` method compilation
+- [ ] Message serialization/deserialization
+- [ ] Mailroom infrastructure in the runtime
 
 **Success criteria**: Multiple workers can send and receive messages in a compiled program.
 
@@ -113,11 +113,11 @@ worker example() {
 **Goal**: Support the plugin model with traits and annotation-driven entry point generation.
 
 **Additions**:
-- Trait declarations with `Agent` inheritance
-- Method definitions in traits
-- `@skill` and `@command` annotation parsing
-- `self.delegate()` compilation
-- Plugin manifest generation (for Claude Code)
+- [ ] Trait declarations with `Agent` inheritance
+- [ ] Method definitions in traits
+- [ ] `@skill` and `@command` annotation parsing
+- [ ] `self.delegate()` compilation
+- [ ] Plugin manifest generation (for Claude Code)
 
 **Success criteria**: A complete plugin (trait + workers) compiles to a valid Claude Code plugin structure with skill/command entry points.
 
@@ -136,10 +136,10 @@ trait Example: Agent {
 **Goal**: Support multi-file projects with imports and exports.
 
 **Additions**:
-- Module resolution
-- Import statement compilation
-- Export declarations (workers, traits, functions)
-- Cross-file dependency tracking
+- [ ] Module resolution
+- [ ] Import statement compilation
+- [ ] Export declarations (workers, traits, functions)
+- [ ] Cross-file dependency tracking
 
 **Success criteria**: The historian example (4 files with imports) compiles successfully.
 
@@ -150,11 +150,11 @@ trait Example: Agent {
 **Goal**: Add basic type checking without full precision.
 
 **Additions**:
-- Symbol table construction
-- Scope analysis and variable binding validation
-- Basic type inference (for simple cases)
-- Type annotation validation (check declared types are well-formed)
-- Compile-time error for undefined variables
+- [ ] Symbol table construction
+- [ ] Scope analysis and variable binding validation
+- [ ] Basic type inference (for simple cases)
+- [ ] Type annotation validation (check declared types are well-formed)
+- [ ] Compile-time error for undefined variables
 
 **Success criteria**: Common errors (typos, undefined variables) are caught at compile time.
 
@@ -165,10 +165,10 @@ trait Example: Agent {
 **Goal**: Compile `throw` expressions and ensure proper error propagation.
 
 **Additions**:
-- `throw` expression compilation
-- Error propagation in generated JS
-- Session cleanup on errors
-- Error context in IPC protocol
+- [ ] `throw` expression compilation
+- [ ] Error propagation in generated JS
+- [ ] Session cleanup on errors
+- [ ] Error context in IPC protocol
 
 **Success criteria**: A worker that throws an error properly terminates and cleans up its session.
 
@@ -177,10 +177,10 @@ trait Example: Agent {
 **Goal**: Add runtime safety mechanisms for shell commands.
 
 **Additions**:
-- Variable substitution that prevents injection
-- Exit code handling
-- Error reporting for failed commands
-- Stream redirection support
+- [ ] Variable substitution that prevents injection
+- [ ] Exit code handling
+- [ ] Error reporting for failed commands
+- [ ] Stream redirection support
 
 **Success criteria**: Shell commands with interpolated variables execute safely without injection vulnerabilities.
 
@@ -189,10 +189,10 @@ trait Example: Agent {
 **Goal**: Validate the entire pipeline with real Claude Code plugin execution.
 
 **Additions**:
-- Full IPC transport implementation (not mocked)
-- Claude Code plugin runtime integration
-- Session management with actual subagent spawning
-- Complete mailroom implementation
+- [ ] Full IPC transport implementation (not mocked)
+- [ ] Claude Code plugin runtime integration
+- [ ] Session management with actual subagent spawning
+- [ ] Complete mailroom implementation
 
 **Success criteria**: The compiled historian plugin runs successfully in Claude Code and rewrites git commits.
 
@@ -201,29 +201,29 @@ trait Example: Agent {
 **Goal**: Improve developer experience and code quality.
 
 **Additions**:
-- Better error messages with source locations
-- Optimization passes (dead code elimination, constant folding)
-- Generated code formatting and readability
-- Compiler diagnostics and warnings
-- Documentation generation from annotations
+- [ ] Better error messages with source locations
+- [ ] Optimization passes (dead code elimination, constant folding)
+- [ ] Generated code formatting and readability
+- [ ] Compiler diagnostics and warnings
+- [ ] Documentation generation from annotations
 
 **Success criteria**: The compiler produces helpful errors and generates clean, readable output.
 
 ## Testing Strategy
 
 **Per-phase testing**:
-- Unit tests for each compilation pass
-- Golden file tests comparing generated output to expected output
-- Integration tests for each new feature
+- [ ] Unit tests for each compilation pass
+- [ ] Golden file tests comparing generated output to expected output
+- [ ] Integration tests for each new feature
 
 **Continuous validation**:
-- Keep the historian example compiling at all times (starting from Phase 6)
-- Run generated JS through a linter
-- Validate generated markdown is well-formed
+- [ ] Keep the historian example compiling at all times (starting from Phase 6)
+- [ ] Run generated JS through a linter
+- [ ] Validate generated markdown is well-formed
 
 **Regression prevention**:
-- Add tests for bugs as they're discovered
-- Maintain a test suite that exercises all language features
+- [ ] Add tests for bugs as they're discovered
+- [ ] Maintain a test suite that exercises all language features
 
 ## Non-Goals for MVP
 
@@ -242,10 +242,10 @@ These are explicitly deferred to post-MVP iterations:
 
 The MVP is complete when:
 
-1. The historian example compiles without errors
-2. The generated plugin loads in Claude Code
-3. Running the plugin successfully rewrites git commits
-4. The generated code is readable and maintainable
-5. Common errors are caught at compile time
+- [ ] The historian example compiles without errors
+- [ ] The generated plugin loads in Claude Code
+- [ ] Running the plugin successfully rewrites git commits
+- [ ] The generated code is readable and maintainable
+- [ ] Common errors are caught at compile time
 
 This represents a **functionally complete but unpolished** compiler suitable for early testing and iteration.
