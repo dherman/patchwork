@@ -1,0 +1,31 @@
+# Build artifacts
+target/
+Cargo.lock
+
+# Rust source (not needed for the extension)
+crates/
+**/*.rs
+
+# Tests
+test/
+
+# Documentation (except extension docs)
+docs/
+archive/
+examples/
+
+# Git
+.git/
+.gitignore
+
+# Claude and Sparkle (workspace-specific)
+.claude/
+.sparkle-space/
+
+# VS Code workspace files (not needed in extension)
+.vscode/
+*.code-workspace
+
+# Temporary files
+*.pw
+!syntaxes/*.tmLanguage.json

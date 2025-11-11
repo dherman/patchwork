@@ -1,0 +1,17 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.associations": {
+      "*.pw": "patchwork"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "dherman.patchwork-vscode"
+    ]
+  }
+}

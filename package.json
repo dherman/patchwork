@@ -4,6 +4,10 @@
   "description": "Syntax highlighting and language support for Patchwork (.pw files)",
   "version": "0.0.1",
   "publisher": "dherman",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dherman/patchwork"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
