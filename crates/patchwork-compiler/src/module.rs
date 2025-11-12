@@ -66,13 +66,14 @@ impl ModuleResolver {
 
     /// Recursively resolve a module and its dependencies
     fn resolve_module(&mut self, module_id: &str, path: &Path) -> Result<()> {
-        // Check for circular dependency
-        if self.visiting.contains(module_id) {
-            return Err(CompileError::CircularDependency(module_id.to_string()));
-        }
-
         // Skip if already resolved
         if self.modules.contains_key(module_id) {
+            return Ok(());
+        }
+
+        // Skip if currently being visited (cycle detected - this is OK!)
+        // Cycles in module graphs are allowed, just like in JS and Rust
+        if self.visiting.contains(module_id) {
             return Ok(());
         }
 
