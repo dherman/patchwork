@@ -202,6 +202,10 @@ worker member() {
 #[test]
 fn test_function_call() {
     let source = r#"
+fun foo(x, y) {
+    return x + y
+}
+
 worker caller() {
     var result = foo(1, 2)
     return result

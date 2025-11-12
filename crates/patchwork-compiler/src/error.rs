@@ -36,6 +36,9 @@ pub enum CompileError {
 
     #[error("Module resolution error for {path}: {reason}")]
     ModuleResolution { path: String, reason: String },
+
+    #[error("Type error: {message}")]
+    TypeError { message: String },
 }
 
 impl CompileError {
@@ -55,5 +58,11 @@ impl CompileError {
 
     pub fn codegen(message: impl Into<String>) -> Self {
         CompileError::Codegen(message.into())
+    }
+
+    pub fn type_error(message: impl Into<String>) -> Self {
+        CompileError::TypeError {
+            message: message.into(),
+        }
     }
 }

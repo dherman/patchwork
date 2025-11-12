@@ -8,6 +8,7 @@ use crate::codegen::CodeGenerator;
 use crate::prompts::PromptTemplate;
 use crate::manifest::PluginManifest;
 use crate::module::ModuleResolver;
+use crate::typecheck::TypeChecker;
 
 /// Compilation output structure
 pub struct CompileOutput {
@@ -102,6 +103,14 @@ impl Compiler {
             eprintln!("Parse successful: {} items", ast.items.len());
         }
 
+        // Type check the AST
+        let mut type_checker = TypeChecker::new();
+        type_checker.check_program(&ast)?;
+
+        if self.options.verbose {
+            eprintln!("Type checking successful");
+        }
+
         // Generate JavaScript code
         let (javascript, prompt_templates, manifest) = self.generate_code(&ast)?;
 
@@ -173,6 +182,14 @@ impl Compiler {
             // This ensures the AST references are valid
             let ast = patchwork_parser::parse(&module.source)
                 .map_err(|e| CompileError::parse(&module.path, e.to_string()))?;
+
+            // Type check the module
+            let mut type_checker = TypeChecker::new();
+            type_checker.check_program(&ast)?;
+
+            if self.options.verbose {
+                eprintln!("Type checking successful for module: {}", module.id);
+            }
 
             let mut generator = CodeGenerator::new();
             generator.set_module_id(&module.id);

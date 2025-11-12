@@ -10,6 +10,7 @@ pub mod runtime;
 pub mod prompts;
 pub mod manifest;
 pub mod module;
+pub mod typecheck;
 
 pub use driver::{Compiler, CompileOptions, CompileOutput};
 pub use error::{CompileError, Result};
@@ -17,3 +18,4 @@ pub use codegen::CodeGenerator;
 pub use prompts::{PromptTemplate, PromptKind};
 pub use manifest::{PluginManifest, SkillEntry, CommandEntry};
 pub use module::{ModuleResolver, Module, ModuleExports};
+pub use typecheck::{TypeChecker, Type, Symbol, SymbolKind};
