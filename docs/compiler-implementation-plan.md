@@ -135,11 +135,11 @@ worker example() {
 - [x] `@skill` and `@command` annotation parsing
 - [x] `self.delegate()` compilation
 - [x] Array and object destructuring support
-- [ ] Plugin manifest generation (for Claude Code) - **Deferred to Phase 6.5**
+- [x] Plugin manifest generation (for Claude Code) - **Completed in Phase 6.5**
 
-**Success criteria**: A complete plugin (trait + workers) compiles to a valid Claude Code plugin structure with skill/command entry points. ✅ (Core compilation working; manifest generation deferred)
+**Success criteria**: A complete plugin (trait + workers) compiles to a valid Claude Code plugin structure with skill/command entry points. ✅
 
-**Completion details**: See [phase6-completion-summary.md](phase6-completion-summary.md)
+**Completion details**: See [phase6-completion-summary.md](phase6-completion-summary.md) and [phase6.5-completion-summary.md](phase6.5-completion-summary.md)
 
 **Example input**:
 ```patchwork

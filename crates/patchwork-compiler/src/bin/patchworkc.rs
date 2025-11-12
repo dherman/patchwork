@@ -57,6 +57,7 @@ fn main() {
                     println!("  Generated {} bytes of JavaScript", output.javascript.len());
                     println!("  Runtime: {} bytes", output.runtime.len());
                     println!("  Prompts: {} templates", output.prompts.len());
+                    println!("  Plugin manifest: {} files", output.manifest_files.len());
                     println!("\nGenerated code:");
                 }
                 println!("{}", output.javascript);
@@ -70,6 +71,14 @@ fn main() {
                         for (id, markdown) in &output.prompts {
                             println!("\n--- {} ---", id);
                             println!("{}", markdown);
+                        }
+                    }
+
+                    if !output.manifest_files.is_empty() {
+                        println!("\n=== Plugin Manifest Files ===");
+                        for (path, content) in &output.manifest_files {
+                            println!("\n--- {} ---", path);
+                            println!("{}", content);
                         }
                     }
                 }

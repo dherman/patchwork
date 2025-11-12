@@ -5,6 +5,7 @@
 use patchwork_parser::ast::*;
 use crate::error::{CompileError, Result};
 use crate::prompts::{PromptTemplate, PromptKind, extract_prompt_template};
+use crate::manifest::{PluginManifest, SkillEntry, CommandEntry};
 use std::fmt::Write as _;
 
 /// JavaScript code generator
@@ -17,6 +18,8 @@ pub struct CodeGenerator {
     prompts: Vec<PromptTemplate>,
     /// Counter for generating unique prompt IDs
     prompt_counter: usize,
+    /// Plugin manifest (if trait with annotations is compiled)
+    manifest: Option<PluginManifest>,
 }
 
 impl CodeGenerator {
@@ -27,12 +30,18 @@ impl CodeGenerator {
             output: String::new(),
             prompts: Vec::new(),
             prompt_counter: 0,
+            manifest: None,
         }
     }
 
     /// Get the extracted prompt templates
     pub fn prompts(&self) -> &[PromptTemplate] {
         &self.prompts
+    }
+
+    /// Get the plugin manifest (if any)
+    pub fn manifest(&self) -> Option<&PluginManifest> {
+        self.manifest.as_ref()
     }
 
     /// Generate JavaScript code for a program
@@ -150,6 +159,11 @@ impl CodeGenerator {
 
         let export_prefix = if trait_decl.is_exported { "export " } else { "" };
 
+        // Extract plugin manifest from trait with annotations
+        if trait_decl.is_exported && !trait_decl.methods.is_empty() {
+            self.extract_plugin_manifest(trait_decl);
+        }
+
         for method in &trait_decl.methods {
             // Generate comment showing this came from a trait
             write!(self.output, "// Method from trait {}\n", trait_decl.name)?;
@@ -174,6 +188,60 @@ impl CodeGenerator {
         }
 
         Ok(())
+    }
+
+    /// Extract plugin manifest from trait annotations
+    fn extract_plugin_manifest(&mut self, trait_decl: &TraitDecl) {
+        // Only create manifest if there are annotations
+        let has_annotations = trait_decl.methods.iter()
+            .any(|m| !m.annotations.is_empty());
+
+        if !has_annotations {
+            return;
+        }
+
+        let mut manifest = PluginManifest::new(trait_decl.name.to_lowercase());
+
+        // Process each method's annotations
+        for method in &trait_decl.methods {
+            let mut skill_name = None;
+            let mut command_name = None;
+
+            // Collect annotations
+            for annotation in &method.annotations {
+                match annotation.name {
+                    "skill" => {
+                        skill_name = Some(annotation.arg.unwrap_or(method.name).to_string());
+                    }
+                    "command" => {
+                        command_name = Some(annotation.arg.unwrap_or(method.name).to_string());
+                    }
+                    _ => {}
+                }
+            }
+
+            // Create skill entry
+            if let Some(ref name) = skill_name {
+                manifest.skills.push(SkillEntry {
+                    name: name.clone(),
+                    function: method.name.to_string(),
+                    description: None,  // TODO: Extract from doc comments
+                    params: method.params.iter().map(|p| p.name.to_string()).collect(),
+                });
+            }
+
+            // Create command entry
+            if let Some(cmd_name) = command_name {
+                manifest.commands.push(CommandEntry {
+                    name: cmd_name,
+                    skill: skill_name,  // Link to skill if both annotations present
+                    function: method.name.to_string(),
+                    description: None,  // TODO: Extract from doc comments
+                });
+            }
+        }
+
+        self.manifest = Some(manifest);
     }
 
     /// Generate code for a block

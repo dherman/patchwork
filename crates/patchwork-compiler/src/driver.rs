@@ -6,6 +6,7 @@ use patchwork_parser::ast::Program;
 use crate::error::{CompileError, Result};
 use crate::codegen::CodeGenerator;
 use crate::prompts::PromptTemplate;
+use crate::manifest::PluginManifest;
 
 /// Compilation output structure
 pub struct CompileOutput {
@@ -15,11 +16,14 @@ pub struct CompileOutput {
     pub source: String,
     /// Generated JavaScript code
     pub javascript: String,
-    /// Runtime JavaScript code 
+    /// Runtime JavaScript code
     pub runtime: String,
-    /// Prompt templates extracted during compilation 
+    /// Prompt templates extracted during compilation
     /// Map from template ID to markdown content
     pub prompts: HashMap<String, String>,
+    /// Plugin manifest (if trait with annotations was compiled)
+    /// Map from relative path to file content
+    pub manifest_files: HashMap<String, String>,
 }
 
 /// Options for compilation
@@ -81,11 +85,14 @@ impl Compiler {
         }
 
         // Generate JavaScript code
-        let (javascript, prompt_templates) = self.generate_code(&ast)?;
+        let (javascript, prompt_templates, manifest) = self.generate_code(&ast)?;
 
         if self.options.verbose {
             eprintln!("Code generation successful: {} bytes", javascript.len());
             eprintln!("Extracted {} prompt templates", prompt_templates.len());
+            if manifest.is_some() {
+                eprintln!("Generated plugin manifest");
+            }
         }
 
         // Include runtime code
@@ -96,12 +103,17 @@ impl Compiler {
             .map(|t| (t.id.clone(), t.markdown.clone()))
             .collect();
 
+        // Convert manifest to file map
+        let manifest_files = manifest.map(|m| m.get_files())
+            .unwrap_or_default();
+
         Ok(CompileOutput {
             source_file: self.options.input.clone(),
             source,
             javascript,
             runtime,
             prompts,
+            manifest_files,
         })
     }
 
@@ -122,11 +134,12 @@ impl Compiler {
     }
 
     /// Generate JavaScript code from AST and extract prompt templates
-    fn generate_code(&self, ast: &Program) -> Result<(String, Vec<PromptTemplate>)> {
+    fn generate_code(&self, ast: &Program) -> Result<(String, Vec<PromptTemplate>, Option<PluginManifest>)> {
         let mut generator = CodeGenerator::new();
         let javascript = generator.generate(ast)?;
         let prompts = generator.prompts().to_vec();
-        Ok((javascript, prompts))
+        let manifest = generator.manifest().cloned();
+        Ok((javascript, prompts, manifest))
     }
 
     /// Get the output directory (creates if needed)
