@@ -321,6 +321,67 @@ export async function shell(command, options = {}) {
   });
 }
 
+// Export as $shell for generated code
+export { shell as $shell };
+
+/**
+ * Execute a shell pipe (cmd1 | cmd2)
+ *
+ * Connects stdout of first command to stdin of second command.
+ *
+ * @param {Array<string>} commands - Array of command strings to pipe together
+ * @param {Object} options - Execution options
+ * @returns {Promise<string>} - The output of the final command if capture=true
+ */
+export async function $shellPipe(commands, options = {}) {
+  // Join commands with pipe operator and execute as single shell command
+  const pipeCmd = commands.join(' | ');
+  return shell(pipeCmd, options);
+}
+
+/**
+ * Execute shell commands with && operator (cmd1 && cmd2)
+ *
+ * Executes second command only if first succeeds.
+ *
+ * @param {Array<string>} commands - Array of command strings to chain
+ * @param {Object} options - Execution options
+ * @returns {Promise<string>} - The output if capture=true, otherwise empty string
+ */
+export async function $shellAnd(commands, options = {}) {
+  const andCmd = commands.join(' && ');
+  return shell(andCmd, options);
+}
+
+/**
+ * Execute shell commands with || operator (cmd1 || cmd2)
+ *
+ * Executes second command only if first fails.
+ *
+ * @param {Array<string>} commands - Array of command strings to chain
+ * @param {Object} options - Execution options
+ * @returns {Promise<string>} - The output if capture=true, otherwise empty string
+ */
+export async function $shellOr(commands, options = {}) {
+  const orCmd = commands.join(' || ');
+  return shell(orCmd, options);
+}
+
+/**
+ * Execute shell command with redirection (cmd > file)
+ *
+ * @param {string} command - The command string to execute
+ * @param {string} operator - The redirection operator ('>', '>>', '<', '2>', '2>&1')
+ * @param {string} target - The file path or descriptor for redirection
+ * @param {Object} options - Execution options
+ * @returns {Promise<string>} - Empty string (redirections don't capture)
+ */
+export async function $shellRedirect(command, operator, target, options = {}) {
+  // Build the full command with redirection
+  const redirectCmd = `${command} ${operator} ${target}`;
+  return shell(redirectCmd, { ...options, capture: false });
+}
+
 /**
  * IPC Message types for prompt execution
  * (Mock implementation - full IPC transport to be implemented later)

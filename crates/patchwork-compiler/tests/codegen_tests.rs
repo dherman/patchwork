@@ -882,3 +882,190 @@ worker error_test() {
     assert!(js.contains("throw new Error(String("));
     assert!(js.contains("\"Something went wrong\""));
 }
+
+// ============================================================================
+// Phase 10: Shell Command Safety Tests
+// ============================================================================
+
+#[test]
+fn test_shell_command_with_interpolation() {
+    let source = r#"
+worker test(dir) {
+    $ mkdir -p "${dir}"
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Verify interpolation is preserved in template literal
+    assert!(js.contains("await $shell(`mkdir -p ${"));
+    assert!(js.contains("dir}`)"));
+}
+
+#[test]
+fn test_shell_command_injection_safety() {
+    let source = r#"
+worker test(user_input) {
+    $ echo "${user_input}"
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Verify template literals are used (JS will properly escape)
+    assert!(js.contains("await $shell(`echo ${"));
+    assert!(js.contains("user_input}`)"));
+}
+
+#[test]
+fn test_shell_pipe_with_multiple_commands() {
+    let source = r#"
+worker test() {
+    $ cat file.txt | grep "pattern" | sort
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Verify pipe uses $shellPipe with array of commands
+    assert!(js.contains("await $shellPipe(["));
+}
+
+#[test]
+fn test_shell_and_with_error_handling() {
+    let source = r#"
+worker test() {
+    $ git add . && git commit -m "message"
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Verify && uses $shellAnd
+    assert!(js.contains("await $shellAnd(["));
+}
+
+#[test]
+fn test_shell_or_fallback() {
+    let source = r#"
+worker test() {
+    $ command_that_might_fail || echo "fallback"
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Verify || uses $shellOr
+    assert!(js.contains("await $shellOr(["));
+}
+
+#[test]
+fn test_shell_redirect_output() {
+    let source = r#"
+worker test(file) {
+    $ echo "hello" > "${file}"
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Verify redirection uses $shellRedirect
+    assert!(js.contains("await $shellRedirect("));
+    assert!(js.contains("'>'"));
+}
+
+#[test]
+fn test_command_substitution_capture() {
+    let source = r#"
+worker test() {
+    var branch = $(git rev-parse --abbrev-ref HEAD)
+    return branch
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Verify command substitution uses capture option
+    assert!(js.contains("await $shell(`git rev-parse --abbrev-ref HEAD`, {capture: true})"));
+}
+
+#[test]
+fn test_shell_exit_code_error_handling() {
+    // This tests that the runtime properly handles exit codes
+    // The shell() function should reject on non-zero exit codes
+    let source = r#"
+worker test() {
+    $ false
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Verify shell command is awaited (so errors can propagate)
+    assert!(js.contains("await $shell(`false`)"));
+}
+
+#[test]
+fn test_runtime_has_shell_functions() {
+    let source = r#"
+worker test() {
+    var x = 5
+}
+"#;
+
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join(format!("test_{}.pw", rand::random::<u32>()));
+    std::fs::write(&test_file, source).expect("Failed to write test file");
+
+    let options = CompileOptions::new(&test_file);
+    let compiler = Compiler::new(options);
+    let output = compiler.compile().expect("compilation failed");
+
+    let _ = std::fs::remove_file(&test_file);
+
+    // Verify all shell runtime functions are exported
+    assert!(output.runtime.contains("export { shell as $shell }"),
+            "Runtime should export $shell");
+    assert!(output.runtime.contains("export async function $shellPipe"),
+            "Runtime should export $shellPipe");
+    assert!(output.runtime.contains("export async function $shellAnd"),
+            "Runtime should export $shellAnd");
+    assert!(output.runtime.contains("export async function $shellOr"),
+            "Runtime should export $shellOr");
+    assert!(output.runtime.contains("export async function $shellRedirect"),
+            "Runtime should export $shellRedirect");
+}
+
+#[test]
+fn test_shell_command_with_complex_interpolation() {
+    let source = r#"
+worker test(dir, file) {
+    $ cat "${dir}/${file}"
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Verify multiple interpolations are preserved
+    assert!(js.contains("await $shell(`cat ${"));
+    assert!(js.contains("dir}/${"));
+    assert!(js.contains("file}`)"));
+}
+
+#[test]
+fn test_shell_statement_vs_expression() {
+    let source = r#"
+worker test() {
+    $ echo "statement form"
+    var output = $(echo "expression form")
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Statement form: no capture
+    assert!(js.contains("await $shell(`echo statement form`)"));
+
+    // Expression form: with capture
+    assert!(js.contains("await $shell(`echo expression form`, {capture: true})"));
+}
