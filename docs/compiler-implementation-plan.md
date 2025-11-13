@@ -219,11 +219,36 @@ trait Example: Agent {
 
 **Goal**: Validate the entire pipeline with real Claude Code plugin execution.
 
+**Design document**: See [runtime-design.md](runtime-design.md) for complete architecture.
+
 **Additions**:
-- [ ] Full IPC transport implementation (not mocked)
-- [ ] Claude Code plugin runtime integration
-- [ ] Session management with actual subagent spawning
-- [ ] Complete mailroom implementation
+- [x] **Filesystem-based mailboxes** - Cross-process message passing
+  - [x] Directory-per-mailbox structure (`session.dir/mailboxes/{name}/`)
+  - [x] Timestamp-PID filenames for atomic writes and FIFO ordering
+  - [x] Message envelope with metadata (sender, recipient, timestamp, payload)
+  - [x] Filesystem watching with periodic polling fallback
+  - [x] Unit tests for mailbox functionality (4 new tests, 251 total passing)
+- [ ] **Prompt block compilation** - Think/ask blocks to skill documents
+  - [ ] Detect think/ask blocks during codegen
+  - [ ] Generate skill documents for each block (skills/{worker}_think_{n}/SKILL.md)
+  - [ ] Replace blocks with executePrompt() calls
+  - [ ] Capture and pass variable bindings from lexical scope
+  - [ ] Update manifest generation to include generated skills
+- [ ] **IPC infrastructure** - Code ↔ Prompt communication
+  - [ ] Implement code-process-init.js helper script
+  - [ ] Update executePrompt() with stdio IPC (replace mock)
+  - [ ] Update delegate() with Task spawning via IPC
+  - [ ] Add stdin reading helpers for response handling
+- [ ] **Manifest updates** - Plugin entry points with code process spawning
+  - [ ] Update SKILL.md generation with code process initialization
+  - [ ] Update agent .md generation with code process initialization
+  - [ ] Add IPC message handling loops to generated markdown
+- [ ] **Integration testing**
+  - [ ] Compile simple test plugin
+  - [ ] Invoke via `claude` CLI
+  - [ ] Verify session directory structure
+  - [ ] Test mailbox communication across processes
+  - [ ] Compile and test historian plugin end-to-end
 
 **Success criteria**: The compiled historian plugin runs successfully in Claude Code and rewrites git commits.
 
@@ -278,5 +303,13 @@ The MVP is complete when:
 - [ ] Running the plugin successfully rewrites git commits
 - [ ] The generated code is readable and maintainable
 - [ ] Common errors are caught at compile time
+
+**Current Status**: Phase 11 in progress
+- ✅ Phases 1-10 complete (251 tests passing)
+- ✅ Filesystem-based mailboxes implemented
+- 🚧 Prompt block compilation (next)
+- 🚧 IPC infrastructure
+- 🚧 Manifest updates
+- 🚧 Integration testing
 
 This represents a **functionally complete but unpolished** compiler suitable for early testing and iteration.

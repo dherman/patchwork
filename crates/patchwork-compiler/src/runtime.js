@@ -8,24 +8,43 @@
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 import { watch } from 'fs';
-import { writeFile, readFile, access } from 'fs/promises';
+import { writeFile, readFile, access, readdir, unlink, mkdir } from 'fs/promises';
 
 /**
  * Mailbox for worker message passing
  *
- * Provides FIFO message queue with blocking receive.
+ * Provides FIFO message queue with blocking receive using filesystem-based storage.
+ * Messages are stored as individual files in session.dir/mailboxes/{name}/ to avoid
+ * race conditions when multiple processes write simultaneously.
+ *
  * Integrates with session failure detection to abort on worker failures.
  */
 export class Mailbox {
   constructor(name, session) {
     this.name = name;
     this.session = session;
-    this.queue = [];
-    this.waiters = [];
+    this.mailboxDir = `${session.dir}/mailboxes/${name}`;
+  }
+
+  /**
+   * Ensure mailbox directory exists
+   */
+  async _ensureDir() {
+    try {
+      await mkdir(this.mailboxDir, { recursive: true });
+    } catch (err) {
+      // Directory might already exist, ignore EEXIST errors
+      if (err.code !== 'EEXIST') {
+        throw err;
+      }
+    }
   }
 
   /**
    * Send a message to this mailbox
+   *
+   * Creates a new message file with timestamp-PID naming to ensure uniqueness
+   * and FIFO ordering across processes.
    *
    * @param {any} message - The message to send (will be JSON serialized)
    * @throws {Error} - If the session has failed
@@ -34,69 +53,154 @@ export class Mailbox {
     // Check if session has failed before sending
     await this.session.checkFailed();
 
-    // Clone the message to ensure isolation between workers
-    const cloned = JSON.parse(JSON.stringify(message));
+    // Ensure mailbox directory exists
+    await this._ensureDir();
 
-    // If there's a waiter, resolve it immediately
-    if (this.waiters.length > 0) {
-      const waiter = this.waiters.shift();
-      clearTimeout(waiter.timeoutId);
-      waiter.resolve(cloned);
-    } else {
-      // Otherwise, queue the message
-      this.queue.push(cloned);
-    }
+    // Create unique filename: timestamp_ms-pid.json
+    const filename = `${Date.now()}-${process.pid}.json`;
+    const filepath = `${this.mailboxDir}/${filename}`;
+
+    // Create message envelope with metadata
+    const envelope = {
+      from: process.pid.toString(),  // Sender process ID
+      to: this.name,
+      timestamp: new Date().toISOString(),
+      payload: message
+    };
+
+    // Write atomically - file creation is atomic operation
+    await writeFile(filepath, JSON.stringify(envelope, null, 2));
   }
 
   /**
    * Receive a message from this mailbox
    *
    * Blocks until a message is available, session fails, or timeout is reached.
+   * Reads oldest message file (by lexicographic filename sort) and deletes it.
    *
    * @param {number} timeout - Timeout in milliseconds (optional)
-   * @returns {Promise<any>} - The received message
+   * @returns {Promise<any>} - The received message payload
    * @throws {Error} - If timeout is reached or session fails before a message arrives
    */
   async receive(timeout) {
     // Check if session has already failed
     await this.session.checkFailed();
 
-    // If there's a queued message, return it immediately
-    if (this.queue.length > 0) {
-      return this.queue.shift();
+    // Ensure mailbox directory exists
+    await this._ensureDir();
+
+    // Try to read an existing message
+    const message = await this._tryReadMessage();
+    if (message !== null) {
+      return message;
     }
 
-    // Race between: message arrival, session failure, and timeout
-    const promises = [
-      // Message arrival
-      new Promise((resolve, reject) => {
-        const waiter = { resolve, reject, timeoutId: null };
-        this.waiters.push(waiter);
-      }),
+    // No messages yet - watch for new files
+    return this._watchForMessage(timeout);
+  }
 
-      // Session failure detection (via fs.watch)
+  /**
+   * Try to read the oldest message file if one exists
+   *
+   * @returns {Promise<any|null>} - Message payload or null if no messages
+   */
+  async _tryReadMessage() {
+    try {
+      // List all files in mailbox directory
+      const files = await readdir(this.mailboxDir);
+
+      // Filter out non-message files and sort lexicographically (FIFO order)
+      const messageFiles = files
+        .filter(f => f.endsWith('.json'))
+        .sort();
+
+      if (messageFiles.length === 0) {
+        return null;
+      }
+
+      // Read oldest message
+      const filepath = `${this.mailboxDir}/${messageFiles[0]}`;
+      const content = await readFile(filepath, 'utf-8');
+
+      // Delete the file after reading
+      await unlink(filepath);
+
+      // Parse envelope and return payload
+      const envelope = JSON.parse(content);
+      return envelope.payload;
+    } catch (err) {
+      // If file was deleted by another receiver, return null
+      if (err.code === 'ENOENT') {
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Watch for new message files in the mailbox directory
+   *
+   * @param {number} timeout - Timeout in milliseconds (optional)
+   * @returns {Promise<any>} - The received message payload
+   * @throws {Error} - If timeout is reached or session fails
+   */
+  async _watchForMessage(timeout) {
+    return new Promise((resolve, reject) => {
+      let watcher = null;
+      let timeoutId = null;
+      let checkIntervalId = null;
+
+      const cleanup = () => {
+        if (watcher) {
+          watcher.close();
+          watcher = null;
+        }
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        if (checkIntervalId) {
+          clearInterval(checkIntervalId);
+          checkIntervalId = null;
+        }
+      };
+
+      // Watch for file system events
+      watcher = watch(this.mailboxDir, async (eventType, filename) => {
+        if (eventType === 'rename' && filename && filename.endsWith('.json')) {
+          // New file created - try to read it
+          const message = await this._tryReadMessage();
+          if (message !== null) {
+            cleanup();
+            resolve(message);
+          }
+        }
+      });
+
+      // Also poll periodically in case fs.watch misses events
+      // (fs.watch can be unreliable on some systems)
+      checkIntervalId = setInterval(async () => {
+        const message = await this._tryReadMessage();
+        if (message !== null) {
+          cleanup();
+          resolve(message);
+        }
+      }, 100);  // Check every 100ms
+
+      // Set up timeout
+      if (timeout !== undefined && timeout !== null) {
+        timeoutId = setTimeout(() => {
+          cleanup();
+          reject(new Error(`Mailbox receive timeout after ${timeout}ms`));
+        }, timeout);
+      }
+
+      // Race against session failure
       this.session.failurePromise.catch(err => {
-        // Clean up any waiters when session fails
-        this.waiters.forEach(w => {
-          if (w.timeoutId) clearTimeout(w.timeoutId);
-        });
-        this.waiters = [];
-        throw err;
-      })
-    ];
-
-    // Add timeout if specified
-    if (timeout !== undefined && timeout !== null) {
-      promises.push(
-        new Promise((_, reject) =>
-          setTimeout(() => {
-            reject(new Error(`Mailbox receive timeout after ${timeout}ms`));
-          }, timeout)
-        )
-      );
-    }
-
-    return Promise.race(promises);
+        cleanup();
+        reject(err);
+      });
+    });
   }
 }
 

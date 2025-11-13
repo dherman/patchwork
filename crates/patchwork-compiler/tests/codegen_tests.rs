@@ -1069,3 +1069,127 @@ worker test() {
     // Expression form: with capture
     assert!(js.contains("await $shell(`echo expression form`, {capture: true})"));
 }
+
+#[test]
+fn test_filesystem_mailbox_structure() {
+    let source = r#"
+worker example() {
+    self.session.mailbox.test.send({ x: 1 })
+}
+"#;
+
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join(format!("test_{}.pw", rand::random::<u32>()));
+    std::fs::write(&test_file, source).expect("Failed to write test file");
+
+    let options = CompileOptions::new(&test_file);
+    let compiler = Compiler::new(options);
+    let output = compiler.compile().expect("compilation failed");
+
+    let _ = std::fs::remove_file(&test_file);
+
+    // Verify Mailbox constructor stores mailbox directory path
+    assert!(output.runtime.contains("this.mailboxDir = `${session.dir}/mailboxes/${name}`"),
+            "Mailbox should store mailboxDir path");
+
+    // Verify Mailbox creates directory on initialization
+    assert!(output.runtime.contains("mkdir(this.mailboxDir"),
+            "Mailbox should create mailbox directory");
+
+    // Verify send creates unique files with timestamp-PID naming
+    assert!(output.runtime.contains("${Date.now()}-${process.pid}.json"),
+            "Mailbox should use timestamp-PID filename format");
+
+    // Verify receive reads and deletes oldest message
+    assert!(output.runtime.contains("readdir(this.mailboxDir)"),
+            "Mailbox should list directory for messages");
+    assert!(output.runtime.contains("unlink(filepath)"),
+            "Mailbox should delete message file after reading");
+}
+
+#[test]
+fn test_mailbox_message_envelope() {
+    let source = r#"
+worker example() {
+    self.session.mailbox.narrator.send({ type: "test" })
+}
+"#;
+
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join(format!("test_{}.pw", rand::random::<u32>()));
+    std::fs::write(&test_file, source).expect("Failed to write test file");
+
+    let options = CompileOptions::new(&test_file);
+    let compiler = Compiler::new(options);
+    let output = compiler.compile().expect("compilation failed");
+
+    let _ = std::fs::remove_file(&test_file);
+
+    // Verify message envelope structure
+    assert!(output.runtime.contains("from:"),
+            "Message envelope should include sender info");
+    assert!(output.runtime.contains("to: this.name"),
+            "Message envelope should include recipient");
+    assert!(output.runtime.contains("timestamp:"),
+            "Message envelope should include timestamp");
+    assert!(output.runtime.contains("payload: message"),
+            "Message envelope should include payload");
+}
+
+#[test]
+fn test_mailbox_fifo_ordering() {
+    let source = r#"
+worker example() {
+    var msg = self.session.mailbox.test.receive(1000).await
+}
+"#;
+
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join(format!("test_{}.pw", rand::random::<u32>()));
+    std::fs::write(&test_file, source).expect("Failed to write test file");
+
+    let options = CompileOptions::new(&test_file);
+    let compiler = Compiler::new(options);
+    let output = compiler.compile().expect("compilation failed");
+
+    let _ = std::fs::remove_file(&test_file);
+
+    // Verify files are sorted for FIFO ordering
+    assert!(output.runtime.contains(".sort()"),
+            "Mailbox should sort files for FIFO ordering");
+
+    // Verify oldest message is read first
+    assert!(output.runtime.contains("messageFiles[0]"),
+            "Mailbox should read oldest (first) message file");
+}
+
+#[test]
+fn test_mailbox_filesystem_watch() {
+    let source = r#"
+worker example() {
+    var msg = self.session.mailbox.test.receive().await
+}
+"#;
+
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join(format!("test_{}.pw", rand::random::<u32>()));
+    std::fs::write(&test_file, source).expect("Failed to write test file");
+
+    let options = CompileOptions::new(&test_file);
+    let compiler = Compiler::new(options);
+    let output = compiler.compile().expect("compilation failed");
+
+    let _ = std::fs::remove_file(&test_file);
+
+    // Verify filesystem watching for new messages
+    assert!(output.runtime.contains("watch(this.mailboxDir"),
+            "Mailbox should watch directory for new files");
+
+    // Verify periodic polling as fallback
+    assert!(output.runtime.contains("setInterval"),
+            "Mailbox should poll periodically as fallback for fs.watch");
+
+    // Verify cleanup of watchers
+    assert!(output.runtime.contains("watcher.close()"),
+            "Mailbox should clean up filesystem watcher");
+}
