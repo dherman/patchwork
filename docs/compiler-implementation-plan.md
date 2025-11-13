@@ -184,17 +184,22 @@ trait Example: Agent {
 
 **Completion details**: See [phase8-completion-summary.md](phase8-completion-summary.md)
 
-## Phase 9: Error Handling
+## Phase 9: Error Handling ✅
 
 **Goal**: Compile `throw` expressions and ensure proper error propagation.
 
 **Additions**:
-- [ ] `throw` expression compilation
-- [ ] Error propagation in generated JS
-- [ ] Session cleanup on errors
-- [ ] Error context in IPC protocol
+- [x] `throw` expression compilation (already implemented in Phase 2)
+- [x] Error propagation in generated JS (Promise.all fork/join semantics)
+- [x] Session cleanup on errors (cleanup() in delegate finally block)
+- [x] Error context in session state (filesystem-based .failed file)
+- [x] Fork/join delegation with failure propagation
+- [x] Cross-process failure detection via fs.watch
+- [x] Mailbox operations abort on session failure
 
-**Success criteria**: A worker that throws an error properly terminates and cleans up its session.
+**Success criteria**: A worker that throws an error properly terminates and cleans up its session. ✅
+
+**Completion details**: See [phase9-completion-summary.md](phase9-completion-summary.md)
 
 ## Phase 10: Shell Command Safety
 

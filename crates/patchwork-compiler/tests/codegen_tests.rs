@@ -750,6 +750,135 @@ worker example() {
             "Runtime should export Mailbox class");
     assert!(output.runtime.contains("export class Mailroom"),
             "Runtime should export Mailroom class");
-    assert!(output.runtime.contains("this.mailbox = new Mailroom()"),
-            "SessionContext should initialize mailroom");
+    assert!(output.runtime.contains("this.mailbox = new Mailroom(this)"),
+            "SessionContext should initialize mailroom with session reference");
+}
+
+#[test]
+fn test_delegate_function_in_runtime() {
+    let source = r#"
+export default trait Example: Agent {
+    @skill test
+    fun test() {
+        var result = self.delegate([]).await
+    }
+}
+"#;
+
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join(format!("test_{}.pw", rand::random::<u32>()));
+    std::fs::write(&test_file, source).expect("Failed to write test file");
+
+    let options = CompileOptions::new(&test_file);
+    let compiler = Compiler::new(options);
+    let output = compiler.compile().expect("compilation failed");
+
+    let _ = std::fs::remove_file(&test_file);
+
+    // Verify delegate function is exported in runtime
+    assert!(output.runtime.contains("export async function delegate"),
+            "Runtime should export delegate function");
+
+    // Verify delegate implementation includes Promise.all for fork/join
+    assert!(output.runtime.contains("Promise.all(workers)"),
+            "delegate should use Promise.all for fork/join");
+
+    // Verify delegate marks session as failed on error
+    assert!(output.runtime.contains("session.markFailed(error)"),
+            "delegate should mark session as failed on worker error");
+
+    // Verify delegate cleans up session
+    assert!(output.runtime.contains("session.cleanup()"),
+            "delegate should clean up session resources");
+}
+
+#[test]
+fn test_session_failure_tracking() {
+    let source = r#"
+worker test() {
+    var x = 5
+}
+"#;
+
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join(format!("test_{}.pw", rand::random::<u32>()));
+    std::fs::write(&test_file, source).expect("Failed to write test file");
+
+    let options = CompileOptions::new(&test_file);
+    let compiler = Compiler::new(options);
+    let output = compiler.compile().expect("compilation failed");
+
+    let _ = std::fs::remove_file(&test_file);
+
+    // Verify SessionContext has failure tracking fields
+    assert!(output.runtime.contains("this.failureFile"),
+            "SessionContext should have failureFile field");
+    assert!(output.runtime.contains("this.failureWatcher"),
+            "SessionContext should have failureWatcher field");
+    assert!(output.runtime.contains("this.failurePromise"),
+            "SessionContext should have failurePromise field");
+
+    // Verify SessionContext has failure methods
+    assert!(output.runtime.contains("setupFailureWatch()"),
+            "SessionContext should set up failure watch");
+    assert!(output.runtime.contains("async markFailed(error)"),
+            "SessionContext should have markFailed method");
+    assert!(output.runtime.contains("async checkFailed()"),
+            "SessionContext should have checkFailed method");
+    assert!(output.runtime.contains("cleanup()"),
+            "SessionContext should have cleanup method");
+
+    // Verify failure detection uses fs.watch
+    assert!(output.runtime.contains("watch(this.dir"),
+            "SessionContext should watch session directory");
+    assert!(output.runtime.contains(".failed"),
+            "SessionContext should use .failed file for failure signaling");
+}
+
+#[test]
+fn test_mailbox_session_integration() {
+    let source = r#"
+worker test() {
+    var x = 5
+}
+"#;
+
+    let temp_dir = std::env::temp_dir();
+    let test_file = temp_dir.join(format!("test_{}.pw", rand::random::<u32>()));
+    std::fs::write(&test_file, source).expect("Failed to write test file");
+
+    let options = CompileOptions::new(&test_file);
+    let compiler = Compiler::new(options);
+    let output = compiler.compile().expect("compilation failed");
+
+    let _ = std::fs::remove_file(&test_file);
+
+    // Verify Mailbox receives session reference
+    assert!(output.runtime.contains("constructor(name, session)"),
+            "Mailbox should accept session in constructor");
+    assert!(output.runtime.contains("this.session = session"),
+            "Mailbox should store session reference");
+
+    // Verify mailbox operations check for session failure
+    assert!(output.runtime.contains("await this.session.checkFailed()"),
+            "Mailbox send/receive should check if session has failed");
+
+    // Verify receive races against session failure
+    assert!(output.runtime.contains("this.session.failurePromise"),
+            "Mailbox receive should race against session failure promise");
+}
+
+#[test]
+fn test_throw_with_error_wrapping() {
+    let source = r#"
+worker error_test() {
+    throw "Something went wrong"
+}
+"#;
+
+    let js = compile_source(source).expect("compilation failed");
+
+    // Verify throw wraps expression in Error and converts to string
+    assert!(js.contains("throw new Error(String("));
+    assert!(js.contains("\"Something went wrong\""));
 }
