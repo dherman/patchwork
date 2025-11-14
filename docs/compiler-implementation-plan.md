@@ -241,10 +241,10 @@ trait Example: Agent {
   - [x] Add stdin reading helpers for response handling
   - [x] StdinReader class with newline-delimited JSON parsing
   - [x] sendIpcMessage() function for writing to stdout
-- [ ] **Manifest updates** - Plugin entry points with code process spawning
-  - [ ] Update SKILL.md generation with code process initialization
-  - [ ] Update agent .md generation with code process initialization
-  - [ ] Add IPC message handling loops to generated markdown
+- [x] **Manifest updates** - Plugin entry points with code process spawning
+  - [x] Update SKILL.md generation for @skill entry points with code process setup
+  - [x] Add IPC message handling loops to @skill entry points
+  - [x] Update prompt block skill documents with IPC protocol documentation
 - [ ] **Integration testing**
   - [ ] Compile simple test plugin
   - [ ] Invoke via `claude` CLI
@@ -306,12 +306,12 @@ The MVP is complete when:
 - [ ] The generated code is readable and maintainable
 - [ ] Common errors are caught at compile time
 
-**Current Status**: Phase 11 in progress (~60% complete)
+**Current Status**: Phase 11 in progress (~80% complete)
 - ✅ Phases 1-10 complete (251 tests passing)
 - ✅ Filesystem-based mailboxes implemented
 - ✅ Prompt block compilation complete (skill documents generated)
 - ✅ IPC infrastructure complete (stdio bidirectional communication)
-- 🚧 Manifest updates (next)
-- 🚧 Integration testing
+- ✅ Manifest updates complete (skill documents with IPC setup)
+- 🚧 Integration testing (next)
 
 This represents a **functionally complete but unpolished** compiler suitable for early testing and iteration.

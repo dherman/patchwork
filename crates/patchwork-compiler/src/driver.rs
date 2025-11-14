@@ -322,10 +322,12 @@ fn generate_skill_document(skill_name: &str, prompt: &PromptTemplate) -> String 
         kind_label
     ));
 
+    doc.push_str("This skill executes a compiled prompt block that was invoked by worker code.\n\n");
+
     // Variable bindings section (if any)
     if !prompt.required_bindings.is_empty() {
         doc.push_str("## Input Variables\n\n");
-        doc.push_str("The following variables are available:\n\n");
+        doc.push_str("The code process will provide these variable bindings via IPC:\n\n");
 
         let mut bindings: Vec<_> = prompt.required_bindings.iter().collect();
         bindings.sort();
@@ -334,6 +336,7 @@ fn generate_skill_document(skill_name: &str, prompt: &PromptTemplate) -> String 
             doc.push_str(&format!("- `{}`: ${{BINDING_{}}}\n", binding, binding));
         }
         doc.push_str("\n");
+        doc.push_str("These will be received in the IPC message's `bindings` field.\n\n");
     }
 
     // Task section with the actual prompt content
@@ -341,16 +344,32 @@ fn generate_skill_document(skill_name: &str, prompt: &PromptTemplate) -> String 
     doc.push_str(&prompt.markdown);
     doc.push_str("\n\n");
 
-    // Output section
+    // Output instructions
     doc.push_str("## Output\n\n");
     match prompt.kind {
         PromptKind::Think => {
-            doc.push_str("Return your analysis result as structured data.\n");
+            doc.push_str("Return your analysis result as structured data.\n\n");
         }
         PromptKind::Ask => {
-            doc.push_str("Interact with the user and return their response.\n");
+            doc.push_str("Interact with the user and return their response.\n\n");
         }
     }
+
+    doc.push_str("When complete, send the result back to the code process:\n\n");
+    doc.push_str("```json\n");
+    doc.push_str("{\n");
+    doc.push_str("  \"type\": \"promptResult\",\n");
+    doc.push_str("  \"value\": <your result here>\n");
+    doc.push_str("}\n");
+    doc.push_str("```\n\n");
+
+    doc.push_str("If an error occurs, send:\n\n");
+    doc.push_str("```json\n");
+    doc.push_str("{\n");
+    doc.push_str("  \"type\": \"error\",\n");
+    doc.push_str("  \"message\": \"<error description>\"\n");
+    doc.push_str("}\n");
+    doc.push_str("```\n");
 
     doc
 }

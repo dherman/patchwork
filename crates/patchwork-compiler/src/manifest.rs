@@ -125,15 +125,84 @@ impl PluginManifest {
         md.push_str("---\n");
         md.push_str(&format!("name: {}\n", skill.name));
         md.push_str(&format!("description: {}\n", description));
-        md.push_str("allowed-tools: Task, Bash, Read\n");
+        md.push_str("allowed-tools: All\n");
         md.push_str("---\n\n");
         md.push_str(&format!("# {} Skill\n\n", skill.name));
         md.push_str(&format!("{}\n\n", description));
+
         md.push_str("## Input\n\n");
         md.push_str("**$PROMPT**\n\n");
-        md.push_str("## Task\n\n");
-        md.push_str(&format!("Call the `{}` function with the input.\n\n", skill.function));
-        md.push_str("**TODO**: Implement skill logic using compiled workers\n");
+
+        md.push_str("## Setup\n\n");
+        md.push_str("Create a session and spawn the code process:\n\n");
+        md.push_str("```bash\n");
+        md.push_str("# Create session directory\n");
+        md.push_str("SESSION_ID=\"patchwork-$(date +%Y%m%d-%H%M%S)\"\n");
+        md.push_str("WORK_DIR=\"/tmp/$SESSION_ID\"\n");
+        md.push_str("mkdir -p \"$WORK_DIR/mailboxes\"\n");
+        md.push_str("\n");
+        md.push_str("# Spawn code process with stdio IPC\n");
+        md.push_str(&format!("node ./workers/{}.js <<EOF &\n", skill.function));
+        md.push_str("{\n");
+        md.push_str("  \"type\": \"session\",\n");
+        md.push_str("  \"sessionId\": \"$SESSION_ID\",\n");
+        md.push_str("  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\n");
+        md.push_str("  \"workDir\": \"$WORK_DIR\",\n");
+        md.push_str("  \"input\": \"$PROMPT\"\n");
+        md.push_str("}\n");
+        md.push_str("EOF\n");
+        md.push_str("\n");
+        md.push_str("CODE_PID=$!\n");
+        md.push_str("```\n\n");
+
+        md.push_str("## Message Handling\n\n");
+        md.push_str("The code process may send IPC requests. Monitor stdout and respond:\n\n");
+        md.push_str("```bash\n");
+        md.push_str("# Read messages from code process\n");
+        md.push_str("while IFS= read -r line; do\n");
+        md.push_str("  MSG_TYPE=$(echo \"$line\" | jq -r '.type')\n");
+        md.push_str("  \n");
+        md.push_str("  case \"$MSG_TYPE\" in\n");
+        md.push_str("    \"executePrompt\")\n");
+        md.push_str("      # Extract skill name and bindings\n");
+        md.push_str("      SKILL_NAME=$(echo \"$line\" | jq -r '.skill')\n");
+        md.push_str("      BINDINGS=$(echo \"$line\" | jq -c '.bindings')\n");
+        md.push_str("      \n");
+        md.push_str("      # Invoke the skill and get result\n");
+        md.push_str("      # (Use Skill tool or direct prompt execution)\n");
+        md.push_str("      RESULT=$(invoke_skill \"$SKILL_NAME\" \"$BINDINGS\")\n");
+        md.push_str("      \n");
+        md.push_str("      # Send result back to code process\n");
+        md.push_str("      echo \"{\\\"type\\\":\\\"promptResult\\\",\\\"value\\\":$RESULT}\" >&3\n");
+        md.push_str("      ;;\n");
+        md.push_str("    \n");
+        md.push_str("    \"delegate\")\n");
+        md.push_str("      # Extract worker configs\n");
+        md.push_str("      SESSION_ID=$(echo \"$line\" | jq -r '.sessionId')\n");
+        md.push_str("      WORK_DIR=$(echo \"$line\" | jq -r '.workDir')\n");
+        md.push_str("      WORKERS=$(echo \"$line\" | jq -c '.workers')\n");
+        md.push_str("      \n");
+        md.push_str("      # Spawn workers as Task subagents\n");
+        md.push_str("      # Each worker runs as a separate code process\n");
+        md.push_str("      # Wait for all to complete and aggregate results\n");
+        md.push_str("      RESULTS=$(spawn_workers \"$WORKERS\" \"$SESSION_ID\" \"$WORK_DIR\")\n");
+        md.push_str("      \n");
+        md.push_str("      # Send results back\n");
+        md.push_str("      echo \"{\\\"type\\\":\\\"delegateComplete\\\",\\\"results\\\":$RESULTS}\" >&3\n");
+        md.push_str("      ;;\n");
+        md.push_str("    \n");
+        md.push_str("    \"error\")\n");
+        md.push_str("      # Code process encountered an error\n");
+        md.push_str("      ERROR_MSG=$(echo \"$line\" | jq -r '.message')\n");
+        md.push_str("      echo \"Error from code process: $ERROR_MSG\"\n");
+        md.push_str("      exit 1\n");
+        md.push_str("      ;;\n");
+        md.push_str("  esac\n");
+        md.push_str("done < <(tail -f /proc/$CODE_PID/fd/1)\n");
+        md.push_str("```\n\n");
+
+        md.push_str("**Note**: The actual implementation should use proper IPC mechanisms. ");
+        md.push_str("This pseudocode illustrates the message handling pattern.\n");
 
         md
     }
