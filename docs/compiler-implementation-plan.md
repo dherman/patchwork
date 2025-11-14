@@ -234,11 +234,13 @@ trait Example: Agent {
   - [x] Replace blocks with executePrompt() calls with skill names
   - [x] Capture and pass variable bindings from lexical scope
   - [x] Skill documents include frontmatter, variable bindings section, and task content
-- [ ] **IPC infrastructure** - Code ↔ Prompt communication
-  - [ ] Implement code-process-init.js helper script
-  - [ ] Update executePrompt() with stdio IPC (replace mock)
-  - [ ] Update delegate() with Task spawning via IPC
-  - [ ] Add stdin reading helpers for response handling
+- [x] **IPC infrastructure** - Code ↔ Prompt communication
+  - [x] Implement code-process-init.js helper script
+  - [x] Update executePrompt() with stdio IPC (replace mock)
+  - [x] Update delegate() with Task spawning via IPC
+  - [x] Add stdin reading helpers for response handling
+  - [x] StdinReader class with newline-delimited JSON parsing
+  - [x] sendIpcMessage() function for writing to stdout
 - [ ] **Manifest updates** - Plugin entry points with code process spawning
   - [ ] Update SKILL.md generation with code process initialization
   - [ ] Update agent .md generation with code process initialization
@@ -304,12 +306,12 @@ The MVP is complete when:
 - [ ] The generated code is readable and maintainable
 - [ ] Common errors are caught at compile time
 
-**Current Status**: Phase 11 in progress (~40% complete)
+**Current Status**: Phase 11 in progress (~60% complete)
 - ✅ Phases 1-10 complete (251 tests passing)
 - ✅ Filesystem-based mailboxes implemented
 - ✅ Prompt block compilation complete (skill documents generated)
-- 🚧 IPC infrastructure (next)
-- 🚧 Manifest updates
+- ✅ IPC infrastructure complete (stdio bidirectional communication)
+- 🚧 Manifest updates (next)
 - 🚧 Integration testing
 
 This represents a **functionally complete but unpolished** compiler suitable for early testing and iteration.

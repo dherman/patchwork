@@ -487,73 +487,169 @@ export async function $shellRedirect(command, operator, target, options = {}) {
 }
 
 /**
- * IPC Message types for prompt execution
- * (Mock implementation - full IPC transport to be implemented later)
+ * Stdin reading helper for IPC
+ *
+ * Reads newline-delimited JSON messages from stdin.
+ * Used for bidirectional communication with prompt process.
  */
-export class IpcMessage {
-  constructor(type, data) {
-    this.type = type;
-    this.data = data;
+class StdinReader {
+  constructor() {
+    this.buffer = '';
+    this.waiters = [];
+    this.setupStdin();
+  }
+
+  setupStdin() {
+    // Set stdin to read in 'utf8' mode
+    process.stdin.setEncoding('utf8');
+
+    // Read data from stdin
+    process.stdin.on('data', (chunk) => {
+      this.buffer += chunk;
+      this.processBuffer();
+    });
+
+    // Handle stdin close
+    process.stdin.on('end', () => {
+      // Reject all pending waiters
+      for (const waiter of this.waiters) {
+        waiter.reject(new Error('stdin closed unexpectedly'));
+      }
+      this.waiters = [];
+    });
+  }
+
+  processBuffer() {
+    // Process all complete lines in the buffer
+    while (true) {
+      const newlineIndex = this.buffer.indexOf('\n');
+      if (newlineIndex === -1) {
+        // No complete line yet
+        break;
+      }
+
+      // Extract the line
+      const line = this.buffer.slice(0, newlineIndex);
+      this.buffer = this.buffer.slice(newlineIndex + 1);
+
+      // Skip empty lines
+      if (line.trim() === '') {
+        continue;
+      }
+
+      // Parse JSON and deliver to first waiter
+      try {
+        const message = JSON.parse(line);
+        if (this.waiters.length > 0) {
+          const waiter = this.waiters.shift();
+          waiter.resolve(message);
+        } else {
+          // No one waiting - this shouldn't happen in normal operation
+          console.error('[Patchwork Runtime] Received message but no one waiting:', message);
+        }
+      } catch (err) {
+        console.error('[Patchwork Runtime] Failed to parse IPC message:', line, err);
+      }
+    }
+  }
+
+  /**
+   * Read the next message from stdin
+   *
+   * @param {number} timeout - Optional timeout in milliseconds
+   * @returns {Promise<Object>} - The parsed JSON message
+   * @throws {Error} - If timeout is reached or stdin closes
+   */
+  async readMessage(timeout) {
+    return new Promise((resolve, reject) => {
+      // Add to waiters queue
+      const waiter = { resolve, reject };
+      this.waiters.push(waiter);
+
+      // Set up timeout if provided
+      if (timeout !== undefined && timeout !== null) {
+        setTimeout(() => {
+          // Remove from waiters if still present
+          const index = this.waiters.indexOf(waiter);
+          if (index !== -1) {
+            this.waiters.splice(index, 1);
+            reject(new Error(`IPC read timeout after ${timeout}ms`));
+          }
+        }, timeout);
+      }
+    });
   }
 }
 
-export class ThinkRequest extends IpcMessage {
-  constructor(templateId, bindings) {
-    super('ThinkRequest', { templateId, bindings });
+// Global stdin reader instance
+let stdinReader = null;
+
+/**
+ * Get or create the global stdin reader
+ *
+ * @returns {StdinReader} - The global stdin reader instance
+ */
+function getStdinReader() {
+  if (!stdinReader) {
+    stdinReader = new StdinReader();
   }
+  return stdinReader;
 }
 
-export class ThinkResponse extends IpcMessage {
-  constructor(result) {
-    super('ThinkResponse', { result });
-  }
-}
-
-export class AskRequest extends IpcMessage {
-  constructor(templateId, bindings) {
-    super('AskRequest', { templateId, bindings });
-  }
-}
-
-export class AskResponse extends IpcMessage {
-  constructor(result) {
-    super('AskResponse', { result });
-  }
+/**
+ * Send an IPC message to the prompt process via stdout
+ *
+ * @param {Object} message - The message to send (will be JSON serialized)
+ */
+function sendIpcMessage(message) {
+  const line = JSON.stringify(message);
+  process.stdout.write(line + '\n');
 }
 
 /**
  * Execute a prompt block (think or ask)
  *
- * Sends IPC request with template ID and variable bindings.
- * Currently a mock implementation - full IPC transport to be implemented.
+ * Sends IPC request with skill name and variable bindings to the prompt process.
+ * Blocks until the prompt process sends back a response.
  *
  * @param {SessionContext} session - The session context
- * @param {string} templateId - The prompt template ID (e.g., 'think_0')
- * @param {Object} bindings - Variable bindings to interpolate into the template
- * @returns {Promise<any>} - The result from the agent (structure depends on prompt type)
+ * @param {string} skillName - The skill name (e.g., 'greeter_think_0')
+ * @param {Object} bindings - Variable bindings to interpolate into the prompt
+ * @returns {Promise<any>} - The result from the agent
+ * @throws {Error} - If the prompt execution fails or times out
  */
-export async function executePrompt(session, templateId, bindings) {
-  // TODO: Implement full IPC transport for agent communication
-
-  console.log(`[Patchwork Runtime] executePrompt: ${templateId}`);
-  console.log(`[Patchwork Runtime] Session: ${session.id}`);
-  console.log(`[Patchwork Runtime] Bindings:`, bindings);
-
-  // Mock response placeholder
-  return {
-    success: true,
-    message: `Mock response for ${templateId}`,
+export async function executePrompt(session, skillName, bindings) {
+  // Send IPC request to prompt process
+  const request = {
+    type: 'executePrompt',
+    skill: skillName,
+    bindings: bindings || {}
   };
+
+  sendIpcMessage(request);
+
+  // Wait for response from prompt process
+  const reader = getStdinReader();
+  const response = await reader.readMessage();
+
+  // Handle error responses
+  if (response.type === 'error') {
+    throw new Error(response.message || 'Prompt execution failed');
+  }
+
+  // Return the result value
+  return response.value;
 }
 
 /**
  * Delegate work to a group of workers (fork/join pattern)
  *
- * Spawns multiple workers in parallel and waits for all to complete.
- * If any worker fails, the entire session fails and all pending operations abort.
+ * Sends IPC message to the prompt process to spawn worker subagents via Task tool.
+ * Waits for all workers to complete. If any worker fails, the entire session fails.
  *
  * This implements fork/join semantics:
- * - All workers start in parallel
+ * - All workers start in parallel (via Promise.all on generated worker functions)
+ * - Prompt process spawns each worker as a Task subagent
  * - All workers must succeed for delegation to succeed
  * - If any worker fails, session is marked failed and other workers abort
  *
@@ -564,12 +660,31 @@ export async function executePrompt(session, templateId, bindings) {
  */
 export async function delegate(session, workers) {
   try {
-    // Wait for all workers to complete
-    // Promise.all will reject if any worker rejects
-    const results = await Promise.all(workers);
+    // Send IPC message to prompt process to spawn workers
+    // Note: The workers array contains promises that will resolve to worker configs
+    // We need to await them first to get the actual configs
+    const workerConfigs = await Promise.all(workers);
 
-    // All workers succeeded - return results
-    return results;
+    const request = {
+      type: 'delegate',
+      sessionId: session.id,
+      workDir: session.dir,
+      workers: workerConfigs
+    };
+
+    sendIpcMessage(request);
+
+    // Wait for response from prompt process
+    const reader = getStdinReader();
+    const response = await reader.readMessage();
+
+    // Handle error responses
+    if (response.type === 'error') {
+      throw new Error(response.message || 'Worker delegation failed');
+    }
+
+    // Return the results array
+    return response.results;
   } catch (error) {
     // One or more workers failed - mark session as failed
     await session.markFailed(error);

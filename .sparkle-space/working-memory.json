@@ -1,55 +1,67 @@
 {
   "current_phase": "Phase 11: End-to-End Integration",
-  "session_focus": "Prompt block compilation - Complete skill document generation",
+  "session_focus": "IPC Infrastructure - Complete stdio bidirectional communication",
   "key_accomplishments": [
-    "Completed prompt block compilation - second major component of Phase 11",
-    "Enhanced PromptTemplate struct with worker_name field for context tracking",
-    "Implemented worker context tracking in CodeGenerator (current_worker field)",
-    "Updated skill naming convention to include worker: {worker}_{kind}_{n}",
-    "Created generate_skill_document() function producing complete Claude Code skills",
-    "Skill documents include YAML frontmatter, Input Variables section, Task, and Output",
-    "Updated both single-file and multi-file compilation paths in driver",
-    "Fixed all 6 affected test cases to validate new skill document structure",
-    "All 251 tests passing with new functionality fully validated",
-    "Updated compiler-implementation-plan.md to mark Phase 11 as ~40% complete"
+    "Implemented StdinReader class for reading newline-delimited JSON from stdin",
+    "Added buffering, line parsing, and waiter queue for async message delivery",
+    "Replaced mock executePrompt() with real stdio IPC implementation",
+    "Replaced in-memory delegate() with IPC-based worker spawning",
+    "Created code-process-init.js helper script for spawning worker processes",
+    "All 251 tests passing - no regressions from IPC changes",
+    "Updated compiler-implementation-plan.md to mark IPC infrastructure complete",
+    "Phase 11 now ~60% complete (3 of 5 major components done)"
   ],
   "technical_context": {
-    "skill_naming": "Skills named as {module}_{worker}_{kind}_{n} (e.g., main_greeter_think_0)",
-    "skill_path": "skills/{skill_name}/SKILL.md",
-    "generated_js_calls": "await executePrompt(session, 'worker_kind_n', { bindings })",
-    "skill_document_sections": [
-      "YAML frontmatter (name, description, allowed-tools)",
-      "Title with worker and prompt type",
-      "Input Variables section (lists all ${var} bindings)",
-      "Task section (prompt content with placeholders intact)",
-      "Output section (instructions for think vs ask)"
-    ],
+    "ipc_protocol": "Newline-delimited JSON over stdio",
+    "message_types": {
+      "executePrompt": "Code → Prompt: {type, skill, bindings}",
+      "delegate": "Code → Prompt: {type, sessionId, workDir, workers}",
+      "promptResult": "Prompt → Code: {type, value}",
+      "error": "Bidirectional: {type, message}"
+    },
+    "stdin_reader": {
+      "location": "runtime.js:495-582",
+      "features": [
+        "Buffered line reading",
+        "Waiter queue for async delivery",
+        "Optional timeouts",
+        "Graceful stdin closure handling"
+      ]
+    },
+    "code_process_init": {
+      "location": "crates/patchwork-compiler/src/code-process-init.js",
+      "responsibilities": [
+        "Parse CLI args (worker name, session JSON)",
+        "Create SessionContext",
+        "Dynamically import worker module",
+        "Execute worker function",
+        "Send results via stdout",
+        "Handle errors gracefully"
+      ]
+    },
     "key_files_modified": [
-      "crates/patchwork-compiler/src/prompts.rs - Added worker_name to PromptTemplate",
-      "crates/patchwork-compiler/src/codegen.rs - Worker context tracking and skill naming",
-      "crates/patchwork-compiler/src/driver.rs - Skill document generation function",
-      "crates/patchwork-compiler/tests/codegen_tests.rs - Updated 6 tests for new format",
-      "docs/compiler-implementation-plan.md - Marked prompt compilation complete"
+      "crates/patchwork-compiler/src/runtime.js - Added StdinReader, updated executePrompt/delegate",
+      "crates/patchwork-compiler/src/code-process-init.js - New helper script",
+      "docs/compiler-implementation-plan.md - Marked IPC complete, updated progress to 60%"
     ]
   },
   "design_decisions": [
-    "Skill naming includes worker name to avoid conflicts across workers",
-    "Worker context required - compile error if think/ask outside worker",
-    "Single skill document format for both think and ask (differentiated by Output section)",
-    "Variable bindings section uses ${BINDING_name} syntax for runtime substitution",
-    "Module prefix 'main' used for single-file compilation mode"
+    "Newline-delimited JSON chosen for simplicity and debuggability",
+    "Global StdinReader instance to avoid multiple stdin listeners",
+    "Waiter queue pattern allows multiple concurrent IPC calls",
+    "code-process-init.js can read session from stdin or CLI args for flexibility",
+    "Session parameter kept in executePrompt() signature for future use (error context)"
   ],
   "next_steps": [
-    "Implement IPC infrastructure (code-process-init.js and stdio helpers)",
-    "Update executePrompt() from mock to real stdio IPC",
-    "Update delegate() to spawn workers via Task tool",
-    "Generate manifest entry points that spawn code processes",
-    "Integration testing with Claude CLI"
+    "Update skill document generation to spawn code processes",
+    "Add IPC message handling loops to generated markdown",
+    "Update worker agent markdown with code process setup",
+    "Create simple test plugin for end-to-end validation",
+    "Test with real Claude CLI invocation"
   ],
   "active_files": [
-    "crates/patchwork-compiler/src/prompts.rs",
-    "crates/patchwork-compiler/src/codegen.rs",
-    "crates/patchwork-compiler/src/driver.rs",
+    "crates/patchwork-compiler/src/runtime.js",
+    "crates/patchwork-compiler/src/code-process-init.js",
     "docs/compiler-implementation-plan.md",
     "docs/runtime-design.md"
   ]
