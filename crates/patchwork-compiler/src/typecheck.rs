@@ -225,8 +225,11 @@ impl TypeChecker {
                 Item::Type(type_decl) => {
                     self.declare_type(type_decl)?;
                 }
-                Item::Import(_) | Item::Skill(_) => {
-                    // Imports and skills don't declare new symbols (for now)
+                Item::Import(import) => {
+                    self.declare_import(import)?;
+                }
+                Item::Skill(_) => {
+                    // Skills don't declare new symbols
                 }
             }
         }
@@ -247,6 +250,40 @@ impl TypeChecker {
             }
         }
 
+        Ok(())
+    }
+
+    /// Declare imports in the symbol table
+    fn declare_import(&mut self, import: &ImportDecl) -> Result<()> {
+        match &import.path {
+            ImportPath::Simple(segments) => {
+                // Handle std library imports
+                if segments.first() == Some(&"std") && segments.len() == 2 {
+                    let name = segments[1];
+                    // Add std library symbols (currently only log)
+                    match name {
+                        "log" => {
+                            // log is a variadic function: log(...args)
+                            self.scope.add_symbol(
+                                "log".to_string(),
+                                Type::Function {
+                                    params: vec![], // Variadic, so params are unknown
+                                    ret: Box::new(Type::Void),
+                                },
+                                SymbolKind::Function
+                            )?;
+                        }
+                        _ => {
+                            // Unknown std library module - skip for now
+                        }
+                    }
+                }
+                // Other imports (relative) are handled during module resolution
+            }
+            ImportPath::RelativeMulti(_) => {
+                // Multi-imports are handled during module resolution
+            }
+        }
         Ok(())
     }
 

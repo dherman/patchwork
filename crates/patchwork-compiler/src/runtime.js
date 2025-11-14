@@ -696,3 +696,13 @@ export async function delegate(session, workers) {
     session.cleanup();
   }
 }
+
+/**
+ * Standard library: Logging
+ *
+ * Simple logging function for development and debugging.
+ * Maps to console.log for now, can be enhanced with session context later.
+ */
+export function log(...args) {
+  console.log(...args);
+}

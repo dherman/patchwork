@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 use std::process;
+use std::fs;
 use clap::Parser;
 use patchwork_compiler::{Compiler, CompileOptions};
 
@@ -33,9 +34,12 @@ fn main() {
     // Build compiler options
     let mut options = CompileOptions::new(args.input);
 
-    if let Some(output) = args.output {
-        options = options.output_dir(output);
-    }
+    let output_dir = if let Some(ref output) = args.output {
+        options = options.output_dir(output.clone());
+        Some(output.clone())
+    } else {
+        None
+    };
 
     options = options.verbose(args.verbose);
 
@@ -48,9 +52,14 @@ fn main() {
                 // we skip AST dump (no easy way to re-parse)
                 // In future we could store the AST in the output
                 eprintln!("AST dump not available ");
+            } else if let Some(ref dir) = output_dir {
+                // Write files to disk
+                if let Err(e) = write_output_files(&output, dir, args.verbose) {
+                    eprintln!("Failed to write output files: {}", e);
+                    process::exit(1);
+                }
             } else {
-                // Write generated code, runtime, and prompts to stdout
-                // In the future, with --output flag, we'll write to files
+                // Write generated code to stdout (original behavior)
                 if args.verbose {
                     println!("Compilation successful!");
                     println!("  Source: {}", output.source_file.display());
@@ -89,4 +98,61 @@ fn main() {
             process::exit(1);
         }
     }
+}
+
+fn write_output_files(output: &patchwork_compiler::CompileOutput, output_dir: &PathBuf, verbose: bool) -> std::io::Result<()> {
+    // Create output directory
+    fs::create_dir_all(output_dir)?;
+
+    // Write main JavaScript module
+    let main_js = output_dir.join("index.js");
+    fs::write(&main_js, &output.javascript)?;
+    if verbose {
+        println!("Wrote: {}", main_js.display());
+    }
+
+    // Write runtime
+    let runtime_js = output_dir.join("patchwork-runtime.js");
+    fs::write(&runtime_js, &output.runtime)?;
+    if verbose {
+        println!("Wrote: {}", runtime_js.display());
+    }
+
+    // Write prompt templates
+    // These are think/ask blocks compiled to skill documents
+    // Keys are already full paths like "skills/{name}/SKILL.md"
+    for (path, markdown) in &output.prompts {
+        let full_path = output_dir.join(path);
+        if let Some(parent) = full_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&full_path, markdown)?;
+        if verbose {
+            println!("Wrote: {}", full_path.display());
+        }
+    }
+
+    // Write plugin manifest files (includes skills, agents, etc.)
+    for (path, content) in &output.manifest_files {
+        let full_path = output_dir.join(path);
+        if let Some(parent) = full_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&full_path, content)?;
+        if verbose {
+            println!("Wrote: {}", full_path.display());
+        }
+    }
+
+    if verbose {
+        println!("\nCompilation successful! Output written to: {}", output_dir.display());
+        println!("  Main code: index.js");
+        println!("  Runtime: patchwork-runtime.js");
+        println!("  Prompts: {} skill documents", output.prompts.len());
+        println!("  Manifest: {} files", output.manifest_files.len());
+    } else {
+        println!("Compilation successful! Output written to: {}", output_dir.display());
+    }
+
+    Ok(())
 }

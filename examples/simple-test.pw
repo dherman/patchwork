@@ -1,0 +1,19 @@
+worker test_worker(name: string) {
+    var greeting = "Hello"
+    var timestamp = self.session.timestamp
+
+    $ echo "Starting test plugin..."
+
+    think {
+        Testing the Patchwork compiler with user ${name}.
+        Session started at ${timestamp}.
+        Please respond with: "Test successful for ${name}"
+    }
+}
+
+export trait SimpleTest: Agent {
+    @skill test
+    fun test(name: string) {
+        self.delegate([test_worker(name)]).await
+    }
+}

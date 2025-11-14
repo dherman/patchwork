@@ -24,6 +24,8 @@ pub struct CodeGenerator {
     module_id: Option<String>,
     /// Current worker name (for generating prompt skill names)
     current_worker: Option<String>,
+    /// Track if we're inside a delegate array argument (for session parameter injection)
+    in_delegate_array: bool,
 }
 
 impl CodeGenerator {
@@ -37,6 +39,7 @@ impl CodeGenerator {
             manifest: None,
             module_id: None,
             current_worker: None,
+            in_delegate_array: false,
         }
     }
 
@@ -107,7 +110,7 @@ impl CodeGenerator {
         // Import runtime primitives from the bundled runtime file
         let runtime_path = crate::runtime::get_runtime_module_name();
         self.output.push_str("// Patchwork runtime imports\n");
-        write!(self.output, "import {{ shell, SessionContext, executePrompt, delegate }} from '{}';\n\n", runtime_path).unwrap();
+        write!(self.output, "import {{ shell, SessionContext, executePrompt, delegate, log }} from '{}';\n\n", runtime_path).unwrap();
     }
 
     /// Generate import statement
@@ -161,10 +164,10 @@ impl CodeGenerator {
         self.current_worker = Some(worker.name.to_string());
 
         if worker.is_default {
-            write!(self.output, "export default function {}", worker.name)?;
+            write!(self.output, "export default async function {}", worker.name)?;
         } else {
             // Workers are always exported by default
-            write!(self.output, "export function {}", worker.name)?;
+            write!(self.output, "export async function {}", worker.name)?;
         }
 
         self.generate_worker_params(&worker.params)?;
@@ -258,10 +261,11 @@ impl CodeGenerator {
             // Generate the function (exported if trait is exported or default)
             // For default exports, only the first method gets "export default", rest are just "export"
             // Trait methods receive session as first parameter (like workers)
+            // All trait methods are async to support await
             if trait_decl.is_default && i == 0 {
-                write!(self.output, "export default function {}", method.name)?;
+                write!(self.output, "export default async function {}", method.name)?;
             } else {
-                write!(self.output, "{}function {}", export_prefix, method.name)?;
+                write!(self.output, "{}async function {}", export_prefix, method.name)?;
             }
 
             self.output.push('(');
@@ -592,12 +596,19 @@ impl CodeGenerator {
                         if *field == "delegate" {
                             // self.delegate([...]) -> delegate(session, [...])
                             self.output.push_str("delegate(session, ");
+
+                            // Set flag so worker calls inside the array get session injected
+                            let prev_in_delegate = self.in_delegate_array;
+                            self.in_delegate_array = true;
+
                             for (i, arg) in args.iter().enumerate() {
                                 if i > 0 {
                                     self.output.push_str(", ");
                                 }
                                 self.generate_expr(arg)?;
                             }
+
+                            self.in_delegate_array = prev_in_delegate;
                             self.output.push(')');
                             return Ok(());
                         }
@@ -605,8 +616,20 @@ impl CodeGenerator {
                 }
 
                 // Regular function call
+                // If we're in a delegate array and this looks like a worker call, inject session
+                let needs_session_injection = self.in_delegate_array && matches!(**callee, Expr::Identifier(_));
+
                 self.generate_expr(callee)?;
                 self.output.push('(');
+
+                // Inject session as first parameter for worker calls in delegate arrays
+                if needs_session_injection {
+                    self.output.push_str("session");
+                    if !args.is_empty() {
+                        self.output.push_str(", ");
+                    }
+                }
+
                 for (i, arg) in args.iter().enumerate() {
                     if i > 0 {
                         self.output.push_str(", ");
@@ -773,7 +796,7 @@ impl CodeGenerator {
     /// Generate shell command execution (statement form)
     fn generate_shell_command(&mut self, name: &str, args: &[CommandArg]) -> Result<()> {
         // Generate a runtime function call
-        self.output.push_str("await $shell(");
+        self.output.push_str("await shell(");
 
         // Build command string
         self.output.push('`');
@@ -808,8 +831,8 @@ impl CodeGenerator {
 
     /// Generate command substitution (expression form)
     fn generate_command_subst(&mut self, cmd: &Expr) -> Result<()> {
-        // $(cmd) → await $shell(cmd, {capture: true})
-        self.output.push_str("await $shell(");
+        // $(cmd) → await shell(cmd, {capture: true})
+        self.output.push_str("await shell(");
 
         // If cmd is a bare command, extract its parts
         if let Expr::BareCommand { name, args } = cmd {
