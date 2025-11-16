@@ -10,4 +10,6 @@ publish = false
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std"] }
 tower-lsp = "0.20"
 patchwork-parser = { path = "../patchwork-parser" }
+regex = "1"
+once_cell = "1"
 anyhow = "1"

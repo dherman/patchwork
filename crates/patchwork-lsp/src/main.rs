@@ -1,6 +1,8 @@
 use patchwork_parser::parse;
 use patchwork_parser::ParseError;
-use std::collections::HashMap;
+use regex::Regex;
+use once_cell::sync::Lazy;
+use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_lsp::lsp_types::*;
@@ -92,8 +94,9 @@ impl LanguageServer for Backend {
         };
 
         if let Some((range, word)) = word_at_position(&text, position) {
+            let contents = hover_contents_for(&word);
             return Ok(Some(Hover {
-                contents: HoverContents::Scalar(MarkedString::String(word)),
+                contents,
                 range: Some(range),
             }));
         }
@@ -103,10 +106,34 @@ impl LanguageServer for Backend {
 
     async fn completion(
         &self,
-        _: CompletionParams,
+        params: CompletionParams,
     ) -> tower_lsp::jsonrpc::Result<Option<CompletionResponse>> {
-        // Placeholder: no completions yet.
-        Ok(Some(CompletionResponse::Array(Vec::new())))
+        let text_doc = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+
+        let docs = self.documents.read().await;
+        let Some(text) = docs.get(&text_doc) else {
+            return Ok(None);
+        };
+
+        let prefix = prefix_at_position(text, position)
+            .map(|(_, p)| p)
+            .unwrap_or_default();
+
+        let identifiers = collect_identifiers(text);
+        let items: Vec<CompletionItem> = identifiers
+            .into_iter()
+            .filter(|name| prefix.is_empty() || name.starts_with(&prefix))
+            .map(|name| CompletionItem {
+                label: name.clone(),
+                kind: symbol_kind(&name),
+                detail: symbol_detail(&name),
+                insert_text: Some(name),
+                ..CompletionItem::default()
+            })
+            .collect();
+
+        Ok(Some(CompletionResponse::Array(items)))
     }
 }
 
@@ -234,6 +261,68 @@ fn word_at_position(text: &str, position: Position) -> Option<(Range, String)> {
 
 fn is_word_byte(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_'
+}
+
+fn prefix_at_position(text: &str, position: Position) -> Option<(Range, String)> {
+    let Position { line, character } = position;
+    let line = line as usize;
+    let character = character as usize;
+
+    let line_str = text.lines().nth(line)?;
+    if character > line_str.len() {
+        return None;
+    }
+
+    let bytes = line_str.as_bytes();
+    let mut start = character;
+    while start > 0 && is_word_byte(bytes[start - 1]) {
+        start -= 1;
+    }
+    let prefix = &line_str[start..character];
+    let range = Range {
+        start: Position::new(line as u32, start as u32),
+        end: Position::new(line as u32, character as u32),
+    };
+    Some((range, prefix.to_string()))
+}
+
+static IDENT_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"[A-Za-z_][A-Za-z0-9_]*").unwrap());
+static KEYWORDS: &[&str] = &[
+    "worker", "trait", "skill", "task", "fun", "type", "var", "if", "else", "for", "while",
+    "await", "return", "succeed", "fail", "break", "continue", "import", "from", "export",
+    "think", "ask", "do", "self", "true", "false",
+];
+
+fn collect_identifiers(text: &str) -> Vec<String> {
+    let mut seen: BTreeSet<String> = KEYWORDS.iter().map(|s| s.to_string()).collect();
+    for mat in IDENT_RE.find_iter(text) {
+        seen.insert(mat.as_str().to_string());
+    }
+    seen.into_iter().collect()
+}
+
+fn hover_contents_for(symbol: &str) -> HoverContents {
+    if KEYWORDS.contains(&symbol) {
+        HoverContents::Scalar(MarkedString::String(format!("keyword `{symbol}`")))
+    } else {
+        HoverContents::Scalar(MarkedString::String(format!("identifier `{symbol}`")))
+    }
+}
+
+fn symbol_kind(name: &str) -> Option<CompletionItemKind> {
+    if KEYWORDS.contains(&name) {
+        Some(CompletionItemKind::KEYWORD)
+    } else {
+        Some(CompletionItemKind::VARIABLE)
+    }
+}
+
+fn symbol_detail(name: &str) -> Option<String> {
+    if KEYWORDS.contains(&name) {
+        Some("keyword".into())
+    } else {
+        Some("identifier".into())
+    }
 }
 
 #[tokio::main]

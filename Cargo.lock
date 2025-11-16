@@ -948,7 +948,9 @@ name = "patchwork-lsp"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "once_cell",
  "patchwork-parser",
+ "regex",
  "tokio",
  "tower-lsp",
 ]
