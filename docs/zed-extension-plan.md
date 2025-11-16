@@ -47,9 +47,9 @@
 
 **Goal:** Evaluate and, if feasible, ship LSP-backed features powered by the existing Patchwork compiler/runtime.
 
-- [ ] Decide whether to adapt the current compiler into an LSP (diagnostics, hover, completion) or defer.
-- [ ] If pursuing, implement a language server binary (Rust or JS) that reuses `patchwork-parser`/`patchwork-compiler` crates for analysis.
-- [ ] Register `[language_servers.patchwork]` in `extension.toml` with `languages = ["Patchwork"]` and implement `language_server_command` in the Rust extension harness.
+- [x] Decide whether to adapt the current compiler into an LSP (diagnostics, hover, completion) or defer.
+- [x] If pursuing, implement a language server binary (Rust or JS) that reuses `patchwork-parser`/`patchwork-compiler` crates for analysis.
+- [x] Register `[language_servers.patchwork]` in `extension.toml` with `languages = ["Patchwork"]` and implement `language_server_command` in the Rust extension harness.
 - [ ] Map any custom `language_ids` and test completions/diagnostics formatting within Zed.
 
 ## Phase 5: QA & Release

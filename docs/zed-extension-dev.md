@@ -20,5 +20,10 @@ The extension files are rooted at `editors/zed/extension.toml`, `editors/zed/lan
 
 ## Packaging Notes
 - `extension.toml` currently points to the grammar on `main` at `tree-sitter/`.
-- Queries are copied into `editors/zed/queries/patchwork/`. Regenerate them after query edits with `cp tree-sitter/queries/*.scm editors/zed/queries/patchwork/`.
+- Queries are copied into `editors/zed/queries/patchwork/`. Regenerate them after query edits with `./scripts/sync-queries.sh`.
 - Node types are generated at `tree-sitter/src/node-types.json` for downstream reference.
+
+## Language Server
+- A minimal LSP server lives at `crates/patchwork-lsp` (diagnostics placeholder).
+- Run it locally with `./scripts/run-lsp.sh` or `cargo run -p patchwork-lsp`.
+- Zed loads it via `editors/zed/extension.toml` (`languages = ["Patchwork"]`, command `patchwork-lsp`).

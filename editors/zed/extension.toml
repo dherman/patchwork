@@ -10,3 +10,7 @@ repository = "https://github.com/dherman/patchwork"
 repository = "https://github.com/dherman/patchwork"
 rev = "main"
 path = "tree-sitter"
+
+[language_servers.patchwork]
+languages = ["Patchwork"]
+command = "patchwork-lsp"
