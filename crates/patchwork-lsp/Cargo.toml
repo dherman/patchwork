@@ -7,6 +7,6 @@ repository = "https://github.com/dherman/patchwork"
 publish = false
 
 [dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std"] }
 tower-lsp = "0.20"
 patchwork-parser = { path = "../patchwork-parser" }

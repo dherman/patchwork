@@ -14,11 +14,16 @@ pub use token::ParserToken;
 pub use ast::*;
 
 use patchwork_lexer::lex_str;
+use lalrpop_util::ParseError as LalrpopError;
+use crate::adapter::ParseError::{LexerError, UnexpectedToken};
 
 /// Parse a patchwork program from a string
 pub fn parse(input: &str) -> Result<Program<'_>, ParseError> {
     // Create lexer
-    let lexer = lex_str(input).map_err(|e| ParseError::LexerError(e.to_string()))?;
+    let lexer = lex_str(input).map_err(|e| LexerError {
+        message: e.to_string(),
+        byte_offset: None,
+    })?;
 
     // Create adapter
     let adapter = LexerAdapter::new(input, lexer);
@@ -26,7 +31,34 @@ pub fn parse(input: &str) -> Result<Program<'_>, ParseError> {
     // Parse using generated parser
     patchwork::ProgramParser::new()
         .parse(input, adapter)
-        .map_err(|e| ParseError::UnexpectedToken(format!("{:?}", e)))
+        .map_err(|e| match e {
+            LalrpopError::InvalidToken { location } => UnexpectedToken {
+                message: "Invalid token".to_string(),
+                byte_offset: Some(location),
+            },
+            LalrpopError::UnrecognizedEof { location, expected } => UnexpectedToken {
+                message: format!("Unexpected end of file, expected: {:?}", expected),
+                byte_offset: Some(location),
+            },
+            LalrpopError::UnrecognizedToken { token, expected } => {
+                let (location, tok, ..) = token;
+                UnexpectedToken {
+                    message: format!("Unexpected token {:?}, expected: {:?}", tok, expected),
+                    byte_offset: Some(location),
+                }
+            }
+            LalrpopError::ExtraToken { token } => {
+                let (location, tok, ..) = token;
+                UnexpectedToken {
+                    message: format!("Extra token {:?}", tok),
+                    byte_offset: Some(location),
+                }
+            }
+            LalrpopError::User { error } => UnexpectedToken {
+                message: format!("{:?}", error),
+                byte_offset: None,
+            },
+        })
 }
 
 #[cfg(test)]

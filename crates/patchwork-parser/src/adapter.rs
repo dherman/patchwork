@@ -39,15 +39,23 @@ fn position_to_offset(input: &str, line_starts: &[usize], line: usize, column: u
 /// Error type for the parser
 #[derive(Debug)]
 pub enum ParseError {
-    LexerError(String),
-    UnexpectedToken(String),
+    LexerError {
+        message: String,
+        byte_offset: Option<usize>,
+    },
+    UnexpectedToken {
+        message: String,
+        byte_offset: Option<usize>,
+    },
 }
 
 impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseError::LexerError(msg) => write!(f, "Lexer error: {}", msg),
-            ParseError::UnexpectedToken(msg) => write!(f, "Unexpected token: {}", msg),
+            ParseError::LexerError { message, .. } => write!(f, "Lexer error: {}", message),
+            ParseError::UnexpectedToken { message, .. } => {
+                write!(f, "Unexpected token: {}", message)
+            }
         }
     }
 }
@@ -222,7 +230,12 @@ where
                     return Some(Ok((start, parser_token, end)));
                 }
                 Ok(None) => return None,
-                Err(e) => return Some(Err(ParseError::LexerError(e.to_string()))),
+                Err(e) => {
+                    return Some(Err(ParseError::LexerError {
+                        message: e.to_string(),
+                        byte_offset: None,
+                    }))
+                }
             }
         }
     }
