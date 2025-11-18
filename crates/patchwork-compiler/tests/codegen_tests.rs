@@ -30,8 +30,8 @@ worker example() {
 "#;
 
     let js = compile_source(source).expect("compilation failed");
-    // Workers now receive session as first parameter
-    assert!(js.contains("export function example(session)"));
+    // Workers now receive session as first parameter and are async
+    assert!(js.contains("export async function example(session)"));
     assert!(js.contains("let x = 5"));
     assert!(js.contains("return x"));
 }
@@ -46,8 +46,8 @@ worker process(a, b) {
 "#;
 
     let js = compile_source(source).expect("compilation failed");
-    // Workers now receive session as first parameter
-    assert!(js.contains("export function process(session, a, b)"));
+    // Workers now receive session as first parameter and are async
+    assert!(js.contains("export async function process(session, a, b)"));
     assert!(js.contains("let sum = a + b"));
 }
 
@@ -119,7 +119,7 @@ worker run_cmd() {
 "#;
 
     let js = compile_source(source).expect("compilation failed");
-    assert!(js.contains("await $shell(`echo hello`)"));
+    assert!(js.contains("await shell(`echo hello`)"));
 }
 
 #[test]
@@ -132,7 +132,7 @@ worker get_output() {
 "#;
 
     let js = compile_source(source).expect("compilation failed");
-    assert!(js.contains("await $shell(`ls`, {capture: true})"));
+    assert!(js.contains("await shell(`ls`, {capture: true})"));
 }
 
 #[test]
@@ -144,7 +144,7 @@ worker pipe_test() {
 "#;
 
     let js = compile_source(source).expect("compilation failed");
-    assert!(js.contains("await $shellPipe"));
+    assert!(js.contains("await shellPipe"));
 }
 
 #[test]
@@ -156,7 +156,7 @@ worker and_test() {
 "#;
 
     let js = compile_source(source).expect("compilation failed");
-    assert!(js.contains("await $shellAnd"));
+    assert!(js.contains("await shellAnd"));
 }
 
 #[test]
@@ -352,12 +352,12 @@ worker example() {
     let js = compile_source(source).expect("compilation failed");
 
     // Verify all expected components
-    // Workers now receive session as first parameter
-    assert!(js.contains("export function example(session)"));
+    // Workers now receive session as first parameter and are async
+    assert!(js.contains("export async function example(session)"));
     assert!(js.contains("let x = 5"));
-    assert!(js.contains("await $shell(`echo hello`, {capture: true})"));
+    assert!(js.contains("await shell(`echo hello`, {capture: true})"));
     assert!(js.contains("if (x > 3)"));
-    assert!(js.contains("await $shell(`echo x is big`)"));
+    assert!(js.contains("await shell(`echo x is big`)"));
 }
 
 // ====== Session Context Tests ======
@@ -375,11 +375,11 @@ worker example() {
 
     let js = compile_source(source).expect("compilation failed");
 
-    // Check runtime imports are included (includes executePrompt and delegate)
-    assert!(js.contains("import { shell, SessionContext, executePrompt, delegate } from './patchwork-runtime.js'"));
+    // Check runtime imports are included (includes shell, SessionContext, executePrompt, and delegate)
+    assert!(js.contains("import { shell, shellPipe, shellAnd, shellOr, shellRedirect, SessionContext, executePrompt, delegate"));
 
-    // Check worker receives session parameter
-    assert!(js.contains("export function example(session)"));
+    // Check worker receives session parameter and is async
+    assert!(js.contains("export async function example(session)"));
 
     // Check self.session.x is transformed to session.x
     assert!(js.contains("let session_id = session.id"));
@@ -644,8 +644,8 @@ worker example() {
     // Verify runtime includes executePrompt function
     assert!(output.runtime.contains("export async function executePrompt"),
             "Runtime should export executePrompt function");
-    assert!(output.javascript.contains("import { shell, SessionContext, executePrompt, delegate }"),
-            "Generated code should import executePrompt and delegate");
+    assert!(output.javascript.contains("import { shell, shellPipe, shellAnd, shellOr, shellRedirect, SessionContext, executePrompt, delegate"),
+            "Generated code should import all runtime functions");
 }
 
 // ============================================================================
@@ -909,7 +909,7 @@ worker test(dir) {
     let js = compile_source(source).expect("compilation failed");
 
     // Verify interpolation is preserved in template literal
-    assert!(js.contains("await $shell(`mkdir -p ${"));
+    assert!(js.contains("await shell(`mkdir -p ${"));
     assert!(js.contains("dir}`)"));
 }
 
@@ -924,7 +924,7 @@ worker test(user_input) {
     let js = compile_source(source).expect("compilation failed");
 
     // Verify template literals are used (JS will properly escape)
-    assert!(js.contains("await $shell(`echo ${"));
+    assert!(js.contains("await shell(`echo ${"));
     assert!(js.contains("user_input}`)"));
 }
 
@@ -938,8 +938,8 @@ worker test() {
 
     let js = compile_source(source).expect("compilation failed");
 
-    // Verify pipe uses $shellPipe with array of commands
-    assert!(js.contains("await $shellPipe(["));
+    // Verify pipe uses shellPipe with array of commands
+    assert!(js.contains("await shellPipe(["));
 }
 
 #[test]
@@ -952,8 +952,8 @@ worker test() {
 
     let js = compile_source(source).expect("compilation failed");
 
-    // Verify && uses $shellAnd
-    assert!(js.contains("await $shellAnd(["));
+    // Verify && uses shellAnd
+    assert!(js.contains("await shellAnd(["));
 }
 
 #[test]
@@ -966,8 +966,8 @@ worker test() {
 
     let js = compile_source(source).expect("compilation failed");
 
-    // Verify || uses $shellOr
-    assert!(js.contains("await $shellOr(["));
+    // Verify || uses shellOr
+    assert!(js.contains("await shellOr(["));
 }
 
 #[test]
@@ -980,8 +980,8 @@ worker test(file) {
 
     let js = compile_source(source).expect("compilation failed");
 
-    // Verify redirection uses $shellRedirect
-    assert!(js.contains("await $shellRedirect("));
+    // Verify redirection uses shellRedirect
+    assert!(js.contains("await shellRedirect("));
     assert!(js.contains("'>'"));
 }
 
@@ -997,7 +997,7 @@ worker test() {
     let js = compile_source(source).expect("compilation failed");
 
     // Verify command substitution uses capture option
-    assert!(js.contains("await $shell(`git rev-parse --abbrev-ref HEAD`, {capture: true})"));
+    assert!(js.contains("await shell(`git rev-parse --abbrev-ref HEAD`, {capture: true})"));
 }
 
 #[test]
@@ -1013,7 +1013,7 @@ worker test() {
     let js = compile_source(source).expect("compilation failed");
 
     // Verify shell command is awaited (so errors can propagate)
-    assert!(js.contains("await $shell(`false`)"));
+    assert!(js.contains("await shell(`false`)"));
 }
 
 #[test]
@@ -1058,7 +1058,7 @@ worker test(dir, file) {
     let js = compile_source(source).expect("compilation failed");
 
     // Verify multiple interpolations are preserved
-    assert!(js.contains("await $shell(`cat ${"));
+    assert!(js.contains("await shell(`cat ${"));
     assert!(js.contains("dir}/${"));
     assert!(js.contains("file}`)"));
 }
@@ -1075,10 +1075,10 @@ worker test() {
     let js = compile_source(source).expect("compilation failed");
 
     // Statement form: no capture
-    assert!(js.contains("await $shell(`echo statement form`)"));
+    assert!(js.contains("await shell(`echo statement form`)"));
 
     // Expression form: with capture
-    assert!(js.contains("await $shell(`echo expression form`, {capture: true})"));
+    assert!(js.contains("await shell(`echo expression form`, {capture: true})"));
 }
 
 #[test]
