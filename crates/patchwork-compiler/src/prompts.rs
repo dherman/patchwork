@@ -59,6 +59,13 @@ pub fn extract_prompt_template(
                 // and we track what needs to be bound
                 extract_variable_refs(expr, &mut required_bindings)?;
 
+                // Ensure spacing before interpolation
+                // The lexer emits separate Whitespace tokens, but LALRPOP skips them
+                // So we need to add a space if the preceding text doesn't end with whitespace
+                if !markdown.is_empty() && !markdown.ends_with(char::is_whitespace) {
+                    markdown.push(' ');
+                }
+
                 // Generate the placeholder syntax
                 markdown.push_str("${");
                 write_expr_as_placeholder(&mut markdown, expr)?;

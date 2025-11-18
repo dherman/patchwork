@@ -142,13 +142,12 @@ impl PluginManifest {
         md.push_str("mkdir -p \"$WORK_DIR/mailboxes\"\n");
         md.push_str("\n");
         md.push_str("# Spawn code process with stdio IPC\n");
-        md.push_str(&format!("node ./workers/{}.js <<EOF &\n", skill.function));
+        md.push_str(&format!("node ./code-process-init.js {} <<EOF &\n", skill.function));
         md.push_str("{\n");
-        md.push_str("  \"type\": \"session\",\n");
         md.push_str("  \"sessionId\": \"$SESSION_ID\",\n");
         md.push_str("  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\n");
         md.push_str("  \"workDir\": \"$WORK_DIR\",\n");
-        md.push_str("  \"input\": \"$PROMPT\"\n");
+        md.push_str("  \"params\": { \"input\": \"$PROMPT\" }\n");
         md.push_str("}\n");
         md.push_str("EOF\n");
         md.push_str("\n");

@@ -103,16 +103,16 @@ async function main() {
     console.error(`[Code Process] Session ID: ${session.id}`);
     console.error(`[Code Process] Work directory: ${session.dir}`);
 
-    // Dynamically import the worker module
-    const workerPath = resolve(__dirname, 'workers', `${workerName}.js`);
-    const workerModule = await import(workerPath);
+    // Dynamically import the compiled module
+    const modulePath = resolve(__dirname, 'index.js');
+    const compiledModule = await import(modulePath);
 
-    // Check if worker has a main function
-    if (typeof workerModule[workerName] !== 'function') {
-      throw new Error(`Worker module ${workerName} does not export a function named '${workerName}'`);
+    // Check if the function exists in the module
+    if (typeof compiledModule[workerName] !== 'function') {
+      throw new Error(`Compiled module does not export a function named '${workerName}'`);
     }
 
-    const workerFunction = workerModule[workerName];
+    const workerFunction = compiledModule[workerName];
 
     // Extract worker parameters from session data
     const params = sessionData.params || {};

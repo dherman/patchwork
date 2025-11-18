@@ -118,6 +118,13 @@ fn write_output_files(output: &patchwork_compiler::CompileOutput, output_dir: &P
         println!("Wrote: {}", runtime_js.display());
     }
 
+    // Write code process init script
+    let code_init_js = output_dir.join("code-process-init.js");
+    fs::write(&code_init_js, &output.code_process_init)?;
+    if verbose {
+        println!("Wrote: {}", code_init_js.display());
+    }
+
     // Write prompt templates
     // These are think/ask blocks compiled to skill documents
     // Keys are already full paths like "skills/{name}/SKILL.md"
@@ -148,6 +155,7 @@ fn write_output_files(output: &patchwork_compiler::CompileOutput, output_dir: &P
         println!("\nCompilation successful! Output written to: {}", output_dir.display());
         println!("  Main code: index.js");
         println!("  Runtime: patchwork-runtime.js");
+        println!("  Init script: code-process-init.js");
         println!("  Prompts: {} skill documents", output.prompts.len());
         println!("  Manifest: {} files", output.manifest_files.len());
     } else {

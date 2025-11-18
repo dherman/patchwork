@@ -22,6 +22,8 @@ pub struct CompileOutput {
     pub modules: HashMap<String, String>,
     /// Runtime JavaScript code
     pub runtime: String,
+    /// Code process initialization script
+    pub code_process_init: String,
     /// Prompt templates extracted during compilation
     /// Map from template ID to markdown content
     pub prompts: HashMap<String, String>,
@@ -124,6 +126,7 @@ impl Compiler {
 
         // Include runtime code
         let runtime = crate::runtime::get_runtime_code().to_string();
+        let code_process_init = crate::runtime::get_code_process_init().to_string();
 
         // Convert prompt templates to skill documents
         let prompts = prompt_templates.into_iter()
@@ -146,6 +149,7 @@ impl Compiler {
             javascript,
             modules: HashMap::new(), // Single-file mode doesn't use modules
             runtime,
+            code_process_init,
             prompts,
             manifest_files,
         })
@@ -239,6 +243,7 @@ impl Compiler {
 
         // Include runtime code
         let runtime = crate::runtime::get_runtime_code().to_string();
+        let code_process_init = crate::runtime::get_code_process_init().to_string();
 
         // Get entry point module ID
         let entry_module_id = resolver.modules().iter()
@@ -256,6 +261,7 @@ impl Compiler {
             javascript: entry_javascript,
             modules,
             runtime,
+            code_process_init,
             prompts: all_prompts,
             manifest_files,
         })
