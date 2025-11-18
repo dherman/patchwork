@@ -3,3 +3,4 @@
 target
 **/*.vsix
 docs/tmp
+editors/zed/grammars
