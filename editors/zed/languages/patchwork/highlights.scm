@@ -38,6 +38,7 @@
 
 ((parameter name: (identifier) @variable.parameter))
 ((identifier) @variable)
+((exit_status) @variable)
 
 ((object_field key: (identifier) @property))
 ((object_field key: (object_key) @property))

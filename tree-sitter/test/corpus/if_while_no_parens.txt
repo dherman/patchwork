@@ -1,0 +1,82 @@
+================================================================================
+If and while without parentheses
+================================================================================
+worker flow() {
+    if true {
+        do_something()
+    } else {
+        do_other()
+    }
+
+    while count < 3 {
+        count = count + 1
+    }
+}
+--------------------------------------------------------------------------------
+
+(source_file
+  (worker_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block
+      (if_statement
+        condition: (boolean)
+        consequence: (block
+          (expression_statement
+            (call_expression
+              function: (identifier)
+              arguments: (argument_list))))
+        alternative: (else_clause
+          (block
+            (expression_statement
+              (call_expression
+                function: (identifier)
+                arguments: (argument_list))))))
+      (while_statement
+        condition: (binary_expression
+          left: (identifier)
+          right: (number))
+        body: (block
+          (expression_statement
+            (assignment_expression
+              left: (identifier)
+              right: (binary_expression
+                left: (identifier)
+                right: (number)))))))))
+
+================================================================================
+Exit status condition inside prompt do block
+================================================================================
+think {
+    do {
+        $ echo "Run build"
+        if $? = 0 {
+            log("ok")
+        }
+    }
+}
+--------------------------------------------------------------------------------
+
+(source_file
+  (expression_statement
+    (prompt_block
+      body: (prompt_body
+        (prompt_start)
+        (prompt_text)
+        (prompt_do_block
+          (prompt_do)
+          (block
+            (shell_command_statement
+              command: (shell_text))
+            (if_statement
+              condition: (assignment_expression
+                left: (exit_status)
+                right: (number))
+              consequence: (block
+                (expression_statement
+                  (call_expression
+                    function: (identifier)
+                    arguments: (argument_list
+                      (string))))))))
+        (prompt_text)
+        (prompt_end)))))

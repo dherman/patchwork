@@ -207,7 +207,7 @@ module.exports = grammar({
     if_statement: ($) =>
       seq(
         "if",
-        field("condition", $.parenthesized_expression),
+        field("condition", $.expression),
         field("consequence", $.block),
         optional(field("alternative", $.else_clause)),
       ),
@@ -217,7 +217,7 @@ module.exports = grammar({
     while_statement: ($) =>
       seq(
         "while",
-        field("condition", $.parenthesized_expression),
+        field("condition", $.expression),
         field("body", $.block),
       ),
 
@@ -280,6 +280,7 @@ module.exports = grammar({
         $.call_expression,
         $.member_expression,
         $.shell_command_expression,
+        $.exit_status,
         $.prompt_block,
         $.parenthesized_expression,
         $.array_literal,
@@ -294,6 +295,8 @@ module.exports = grammar({
     shell_command_expression: ($) =>
       seq("$(", field("command", $.shell_inner_text), ")"),
 
+    exit_status: (_) => token("$?"),
+
     shell_inner_text: (_) => token.immediate(/[^)]+/),
 
     await_expression: ($) => seq("await", $.expression),
@@ -302,7 +305,7 @@ module.exports = grammar({
       prec.right(
         PREC.assignment,
         seq(
-          field("left", choice($.identifier, $.member_expression)),
+          field("left", choice($.identifier, $.member_expression, $.exit_status)),
           "=",
           field("right", $.expression),
         ),

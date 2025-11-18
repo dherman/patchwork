@@ -869,7 +869,7 @@
           "name": "condition",
           "content": {
             "type": "SYMBOL",
-            "name": "parenthesized_expression"
+            "name": "expression"
           }
         },
         {
@@ -932,7 +932,7 @@
           "name": "condition",
           "content": {
             "type": "SYMBOL",
-            "name": "parenthesized_expression"
+            "name": "expression"
           }
         },
         {
@@ -1206,6 +1206,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "exit_status"
+        },
+        {
+          "type": "SYMBOL",
           "name": "prompt_block"
         },
         {
@@ -1263,6 +1267,13 @@
         }
       ]
     },
+    "exit_status": {
+      "type": "TOKEN",
+      "content": {
+        "type": "STRING",
+        "value": "$?"
+      }
+    },
     "shell_inner_text": {
       "type": "IMMEDIATE_TOKEN",
       "content": {
@@ -1302,6 +1313,10 @@
                 {
                   "type": "SYMBOL",
                   "name": "member_expression"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "exit_status"
                 }
               ]
             }

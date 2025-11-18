@@ -8,13 +8,13 @@ repository = "https://github.com/dherman/patchwork"
 
 [grammars.patchwork]
 # Development (uncomment when iterating locally)
-# repository = "file:///Users/dherman/Code/patchwork"
-# rev = "HEAD"
-# path = "tree-sitter"
-# Production
-repository = "https://github.com/dherman/patchwork"
-rev = "main"
+repository = "file:///Users/dherman/Code/patchwork"
+rev = "2ee6b7f22fe750ac7ef6d0ee6970dee95d0ca35f"
 path = "tree-sitter"
+# Production
+#repository = "https://github.com/dherman/patchwork"
+#rev = "main"
+#path = "tree-sitter"
 
 [language_servers.patchwork]
 languages = ["Patchwork"]

@@ -28,6 +28,10 @@
         "named": true
       },
       {
+        "type": "exit_status",
+        "named": true
+      },
+      {
         "type": "identifier",
         "named": true
       },
@@ -205,6 +209,10 @@
         "multiple": false,
         "required": true,
         "types": [
+          {
+            "type": "exit_status",
+            "named": true
+          },
           {
             "type": "identifier",
             "named": true
@@ -611,7 +619,7 @@
         "required": true,
         "types": [
           {
-            "type": "parenthesized_expression",
+            "type": "expression",
             "named": true
           }
         ]
@@ -1281,7 +1289,7 @@
         "required": true,
         "types": [
           {
-            "type": "parenthesized_expression",
+            "type": "expression",
             "named": true
           }
         ]
@@ -1464,6 +1472,10 @@
   {
     "type": "else",
     "named": false
+  },
+  {
+    "type": "exit_status",
+    "named": true
   },
   {
     "type": "export",
