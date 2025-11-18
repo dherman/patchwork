@@ -8,7 +8,7 @@ repository = "https://github.com/dherman/patchwork"
 
 [grammars.patchwork]
 repository = "file:///Users/dherman/Code/patchwork"
-rev = "f5223292a4ab00257ff95081963534e2c423ab6e"
+rev = "250d71fb2a6abcbfbf10286a6155f700ba9ab9c8"
 path = "tree-sitter"
 # Production (flip these on when shipping)
 # repository = "https://github.com/dherman/patchwork"
