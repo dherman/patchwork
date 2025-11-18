@@ -184,7 +184,17 @@ static bool scan_prompt_interpolation_end(Scanner *scanner, TSLexer *lexer) {
 }
 
 static bool scan_prompt_do(Scanner *scanner, TSLexer *lexer) {
-  if (scanner->prompt_depth_count == 0 || lexer->lookahead != 'd') {
+  if (scanner->prompt_depth_count == 0) {
+    return false;
+  }
+
+  // Skip leading horizontal whitespace inside the prompt body.
+  while (lexer->lookahead == ' ' || lexer->lookahead == '\t' ||
+         lexer->lookahead == '\f') {
+    lexer->advance(lexer, true);
+  }
+
+  if (lexer->lookahead != 'd') {
     return false;
   }
 
@@ -234,26 +244,6 @@ static bool scan_prompt_text(Scanner *scanner, TSLexer *lexer) {
     if (c == '$' || c == '}') {
       DEBUG_LOG("prompt_text stop char=%d depth=%u\n", c, *depth);
       break;
-    }
-
-    // Detect "do" starting a prompt do-block so we can hand control back to the parser.
-    if (c == 'd') {
-      lexer->advance(lexer, false);  // consume 'd'
-      if (lexer->lookahead == 'o') {
-        lexer->advance(lexer, false);  // consume 'o'
-        while (is_whitespace(lexer->lookahead)) {
-          lexer->advance(lexer, true);
-        }
-        if (lexer->lookahead == '{') {
-          lexer->result_symbol = PROMPT_DO;
-          DEBUG_LOG("prompt_text emit PROMPT_DO depth=%u\n", *depth);
-          return true;
-        }
-      }
-      // Not a do-block; treat consumed chars as text and continue.
-      lexer->mark_end(lexer);
-      has_content = true;
-      continue;
     }
 
     if (c == '{') {
