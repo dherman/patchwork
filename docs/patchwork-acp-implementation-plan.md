@@ -75,11 +75,10 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
 
 ### Testing
 
-- [ ] Manual test: Run proxy with `sacp-conductor`
-  - [ ] Verify proxy starts without errors
-  - [ ] Send normal prompt, verify forwarding works
-  - [ ] Send `{ }` code block, verify detection and logging
-  - [ ] Verify error when sending code while eval in progress
+- [x] Manual test: Run proxy with `sacp-conductor`
+  - [x] Verify proxy starts without errors
+  - [x] Send normal prompt, verify forwarding works
+  - [x] Send `{ }` code block, verify detection and logging
 
 ---
 
@@ -258,6 +257,7 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
   - [ ] Set up test interview directories
   - [ ] Run demo code through Zed or conductor
   - [ ] Verify sanitized transcripts written correctly
+- [ ] Verify error when sending code while eval in progress (from Phase 1)
 
 ---
 
