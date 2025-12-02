@@ -1,58 +1,52 @@
 {
-  "session_type": "patchwork_acp_design",
+  "session_type": "patchwork_acp_implementation",
   "workspace": "/Users/dherman/Code/patchwork",
-  "focus": "Design document for Patchwork ACP interpreter - supercharged prompting language",
+  "focus": "Phase 1 complete - Patchwork ACP interpreter infrastructure",
   
   "completed_work": {
-    "design_document": [
-      "Created comprehensive patchwork-acp-design.md",
-      "Defined architecture: interpreter-as-proxy middleware in SACP chain",
-      "Documented core components: patchwork-acp (binary), patchwork-eval (library)",
-      "Specified key API: Interpreter with ControlState (Eval, Yield, Return, Throw)",
-      "Detailed message flow: code detection → interpretation → LLM suspension → response extraction",
-      "Documented design decisions:",
-      "  - Session-scoped interpreter storage (one eval per session)",
-      "  - Direct AST reuse from patchwork-parser",
-      "  - Pre-interpolate variables before sending to LLM",
-      "  - Marker-based response extraction with guided format",
-      "  - Exception semantics for error handling",
-      "  - No resource limits (Turing-complete language)",
-      "Defined demo goal: interview sanitization script"
+    "phase_1_implementation": [
+      "Created patchwork-eval library crate with interpreter core",
+      "Created patchwork-acp binary crate with SACP proxy",
+      "Implemented code detection (prompts starting with {)",
+      "Implemented session management skeleton",
+      "Integrated with existing patchwork-parser for AST generation",
+      "All 200+ workspace tests passing"
     ],
-    "implementation_plan": [
-      "Created patchwork-acp-implementation-plan.md with full task checklists",
-      "Phase 1: Minimal infrastructure (proxy skeleton, code detection)",
-      "Phase 2: Shell command execution (deterministic features)",
-      "Phase 3: LLM integration (think blocks with suspension/resume)",
-      "Phase 4: Polish (error handling, docs, tests)",
-      "Each phase has detailed checkbox tasks and success criteria"
-    ],
-    "collaborative_process": [
-      "Systematically resolved 4 key design questions:",
-      "  1. Interpreter state storage → session-scoped",
-      "  2. Parser reuse → direct AST sharing",
-      "  3. Variable interpolation → pre-interpolate",
-      "  4. Response extraction → guided format with markers",
-      "Refined terminology to match PL conventions (ControlState, Yield, etc.)",
-      "Cleaned up documents: removed implementation details from design doc",
-      "Separated concerns: design.md (architecture) vs implementation-plan.md (tactics)"
-    ]
+    "new_crates": {
+      "patchwork-eval": [
+        "Core types: Interpreter, ControlState, LlmOp, Bindings",
+        "Value enum: Null, String, Number, Boolean, Array, Object",
+        "eval() - parses and executes Patchwork code (stub)",
+        "resume() - continues after LLM response (stub)",
+        "Error types for parse and runtime errors"
+      ],
+      "patchwork-acp": [
+        "SACP proxy using sacp and sacp-proxy crates",
+        "PromptRequest handler with code detection",
+        "Session-scoped interpreter storage",
+        "Forwards non-code prompts to successor",
+        "Tracing/logging to stderr"
+      ]
+    }
   },
   
   "key_files": [
-    "docs/patchwork-acp-design.md - Architecture and design decisions",
-    "docs/patchwork-acp-implementation-plan.md - Phased implementation with task checklists"
+    "crates/patchwork-eval/src/lib.rs - Interpreter library entry point",
+    "crates/patchwork-eval/src/interpreter.rs - Core interpreter with ControlState",
+    "crates/patchwork-eval/src/value.rs - Runtime value types",
+    "crates/patchwork-acp/src/main.rs - ACP proxy binary"
   ],
   
   "next_steps": [
-    "Begin Phase 1 implementation: create crates, set up proxy skeleton",
-    "Implement code detection and basic SACP integration",
-    "Build interpreter skeleton with core types"
+    "Phase 2: Value system with type conversions",
+    "Phase 2: Runtime environment with variables",
+    "Phase 2: Shell command execution",
+    "Phase 2: Expression and statement evaluation"
   ],
   
   "context": {
-    "demo_target": "Interview sanitization script with think blocks in loops",
-    "architecture": "ACP proxy middleware using SACP, interpreter with suspend/resume",
-    "philosophy": "Supercharged prompting language blending deterministic + nondeterministic"
+    "architecture": "Interpreter-as-proxy middleware in SACP chain",
+    "parser_integration": "Uses patchwork_parser::parse() directly",
+    "session_model": "One active evaluation per ACP session"
   }
 }

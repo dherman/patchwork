@@ -1,0 +1,10 @@
+[package]
+name = "patchwork-eval"
+version = "0.1.0"
+edition = "2021"
+description = "Patchwork language interpreter with suspend/resume for LLM integration"
+
+[dependencies]
+patchwork-parser = { path = "../patchwork-parser" }
+
+thiserror = "2.0"
