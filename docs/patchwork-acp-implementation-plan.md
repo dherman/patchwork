@@ -2,6 +2,10 @@
 
 This document outlines the phased implementation strategy for the Patchwork ACP interpreter. See [patchwork-acp-design.md](./patchwork-acp-design.md) for architectural details.
 
+## Architecture Note
+
+**Major Design Update (Phase 3+)**: The implementation now uses a synchronous blocking model inspired by [Niko Matsakis's threadbare prototype](https://github.com/nikomatsakis/threadbare/). The interpreter runs on dedicated OS threads and blocks at `think` blocks, with the OS thread stack automatically preserving all execution context. This eliminates the need for `ControlState` yield/resume and manual continuation management that was planned in the original Phase 3.
+
 ## Goal
 
 Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supercharged prompting language" that blends deterministic control flow with nondeterministic LLM reasoning.
@@ -188,97 +192,207 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
 
 ---
 
-## Phase 3: LLM Integration
+## Phase 3: Threading Infrastructure Refactor
 
-**Goal**: Complete the demo with think blocks
+**Goal**: Refactor evaluation to use synchronous blocking model with threading
 
-**Success Criteria**: Full interview sanitization demo works end-to-end
+**Success Criteria**: Evaluation engine uses `Result<Value, Error>`, ready for agent integration
 
-### Think Block Parsing
+### Remove ControlState System
 
-- [ ] Handle `think { ... }` expressions
-  - [ ] Parse think block prompt text
-  - [ ] Extract variable references for interpolation
-  - [ ] Preserve prompt structure for ACP message
+- [ ] Simplify evaluation return types
+  - [ ] Change `eval_expr()` from `Result<ControlState, Error>` to `Result<Value, Error>`
+  - [ ] Change `eval_statement()` to return `Result<Value, Error>`
+  - [ ] Change `eval_block()` to return `Result<Value, Error>`
+  - [ ] Remove `ControlState` enum entirely
+  - [ ] Remove `try_eval!` macro
 
-- [ ] Implement variable interpolation
-  - [ ] Evaluate `${expr}` in prompt text
-  - [ ] Convert values to strings for embedding
-  - [ ] Handle array spread `$@{expr}` (comma-space join)
+- [ ] Update exception handling
+  - [ ] Add `Error::Exception(Value)` variant
+  - [ ] Change `throw` evaluation to return `Err(Error::Exception(value))`
+  - [ ] Update all error propagation to use `?` operator
+  - [ ] Verify exceptions propagate correctly through call stack
 
-### Interpreter Suspension
-
-- [ ] Implement `Yield` control state
-  - [ ] When evaluating think block, return `ControlState::Yield`
-  - [ ] Include: `op: LlmOp::Think`, interpolated prompt, variable bindings, expected type
-  - [ ] Store interpreter execution context (call stack, loop state, etc.)
-
-- [ ] Make interpreter serializable/clonable
-  - [ ] Ensure all state can be stored in session map
-  - [ ] Consider using `Arc` or similar for shared data
-
-### Proxy Integration
-
-- [ ] Handle `Yield` state in proxy
-  - [ ] Extract prompt and expected type from yield
-  - [ ] Generate type hint instructions (e.g., "Respond with a string value")
-  - [ ] Create ACP prompt request with formatting instructions
-  - [ ] Store interpreter in session map
-  - [ ] Forward prompt request to successor agent
-
-- [ ] Handle agent response
-  - [ ] Retrieve interpreter from session map
-  - [ ] Extract typed value from response:
-    - [ ] Look for ` ```text ... ``` ` fence
-    - [ ] Extract content between markers
-    - [ ] Fallback to full response text if no markers
-  - [ ] Call `interpreter.resume(extracted_value)`
-  - [ ] Handle next control state (Yield, Return, Throw)
-
-### Type Hint Generation
-
-- [ ] Implement type hint formatter
-  - [ ] For `Type::String`: "Respond with a string value. Format your response as:\n\`\`\`text\nyour response here\n\`\`\`"
-  - [ ] Store expected type in Yield state for extraction
-
-- [ ] Implement response extraction
-  - [ ] Parse markdown code fences
-  - [ ] Extract content between ` ```text` and ` ``` `
-  - [ ] Trim whitespace from extracted content
-  - [ ] Return Value::String with extracted text
-
-### Loop Integration
-
-- [ ] Handle multiple suspension points
-  - [ ] Test think block inside for-loop
-  - [ ] Verify state preservation across iterations
-  - [ ] Ensure loop counter and bindings persist
+- [ ] Update interpreter API
+  - [ ] Change `Interpreter::eval()` to return `Result<Value, Error>`
+  - [ ] Remove `Interpreter::resume()` method
+  - [ ] Remove `state` field from `Interpreter`
+  - [ ] Update all tests to use new signatures
 
 ### Testing
 
-- [ ] Unit test: Think block interpolation
-- [ ] Unit test: Response extraction from markdown
-- [ ] Integration test: Single think block
-  - [ ] Mock agent response
-  - [ ] Verify extracted value
-  - [ ] Verify interpreter resumes correctly
-- [ ] Integration test: Think block in loop
-  - [ ] Mock agent responses for each iteration
-  - [ ] Verify all iterations complete
-  - [ ] Verify output files created
-- [ ] End-to-end test: Full demo with real agent
-  - [ ] Set up test interview directories
-  - [ ] Run demo code through Zed or conductor
-  - [ ] Verify sanitized transcripts written correctly
-- [ ] Verify error when sending code while eval in progress (from Phase 1)
+- [ ] Update all existing tests for new signatures
+  - [ ] Change assertions from `ControlState::Return(value)` to `Ok(value)`
+  - [ ] Update error handling tests for `Error::Exception`
+- [ ] Verify all 154 tests still pass
+- [ ] Add test for exception propagation through nested calls
 
 ---
 
-## Phase 4: Type Hints and Polish
+## Phase 4: Agent Infrastructure
 
-**Goal**: Production quality
+**Goal**: Build agent thread infrastructure for LLM communication
 
-**Success Criteria**: Robust error handling, good diagnostics, documented examples
+**Success Criteria**: Agent can create sessions, send prompts, and communicate with interpreter threads
+
+### Agent Core Types
+
+- [ ] Create `agent.rs` module in `patchwork-eval`
+  - [ ] Define `Agent` struct with `UnboundedSender<AgentRequest>`
+  - [ ] Define `AgentRequest` enum:
+    ```rust
+    pub enum AgentRequest {
+        Think {
+            prompt: String,
+            bindings: Bindings,
+            expect: String,
+            response_tx: oneshot::Sender<Value>,
+        },
+    }
+    ```
+  - [ ] Define `ThinkResponse` enum for internal agent use
+  - [ ] Implement `Agent::spawn()` to start agent thread
+
+### Agent Client Loop
+
+- [ ] Implement agent main loop
+  - [ ] Start Tokio runtime for agent thread
+  - [ ] Set up SACP connection to successor agent
+  - [ ] Create unbounded channel for receiving `AgentRequest`s
+  - [ ] Loop: receive requests, spawn `think_message` tasks
+
+### Think Message Task
+
+- [ ] Implement `think_message()` async function
+  - [ ] Create new SACP session with MCP server
+  - [ ] Send prompt request to successor
+  - [ ] Wait for prompt response
+  - [ ] Extract typed value from response (markdown code fence)
+  - [ ] Send value back through `response_tx` oneshot channel
+
+### Redirect Actor (for nested thinks)
+
+- [ ] Implement redirect actor
+  - [ ] Maintain `Vec<Sender<PerSessionMessage>>` stack
+  - [ ] Handle `PushThinker` / `PopThinker` messages
+  - [ ] Route incoming SACP messages to top of stack
+  - [ ] Forward session notifications to active thinker
+  - [ ] Forward MCP tool calls to active thinker
+
+### MCP Do Tool
+
+- [ ] Implement MCP server for `do` tool
+  - [ ] Register tool with SACP session
+  - [ ] Handle `do(number)` invocations from LLM
+  - [ ] Create oneshot channel for result
+  - [ ] Send `DoInvocation` through redirect actor
+  - [ ] Wait for result, return to LLM
+
+### Response Extraction
+
+- [ ] Implement markdown code fence parsing
+  - [ ] Look for ` ```text ... ``` ` or ` ```json ... ``` ` markers
+  - [ ] Extract content between fences
+  - [ ] Trim whitespace from extracted content
+  - [ ] Parse JSON if expect type is not string
+  - [ ] Fallback to full response text if no markers found
+
+### Testing
+
+- [ ] Unit test: Code fence extraction
+  - [ ] Test with text fences
+  - [ ] Test with json fences
+  - [ ] Test fallback when no fences
+- [ ] Unit test: Agent message routing
+  - [ ] Test redirect actor stack behavior
+  - [ ] Test PushThinker/PopThinker operations
+
+---
+
+## Phase 5: Interpreter-Agent Integration
+
+**Goal**: Connect interpreter to agent using blocking channels
+
+**Success Criteria**: Think blocks work end-to-end with synchronous blocking
+
+### Think Block Evaluation
+
+- [ ] Update `eval_think_block()` implementation
+  - [ ] Interpolate prompt text with variable values
+  - [ ] Collect variable bindings for LLM context
+  - [ ] Create oneshot channel for response
+  - [ ] Send `AgentRequest::Think` to agent via mpsc
+  - [ ] Block on `response_rx.recv()`
+  - [ ] Return received `Value` as result
+
+- [ ] Update `Interpreter` struct
+  - [ ] Add `agent_tx: UnboundedSender<AgentRequest>` field
+  - [ ] Update `Interpreter::new(agent: Agent)` to take agent handle
+  - [ ] Remove all `ControlState` references
+
+### Proxy Thread Spawning
+
+- [ ] Update proxy to spawn interpreter threads
+  - [ ] Create shared `Agent` instance on proxy startup
+  - [ ] On code execution: spawn OS thread for interpreter
+  - [ ] In spawned thread: create interpreter with agent handle
+  - [ ] Call `interpreter.eval(code)` (blocks until complete)
+  - [ ] Send result back to proxy via oneshot channel
+  - [ ] Proxy awaits result and returns ACP response
+
+- [ ] Update session tracking
+  - [ ] Change from `HashMap<SessionId, Interpreter>` to `HashSet<SessionId>`
+  - [ ] Mark session active when spawning interpreter thread
+  - [ ] Mark session inactive when interpreter completes
+  - [ ] Return error if session already has active evaluation
+
+### Type Hint Generation
+
+- [ ] Implement type hint formatting
+  - [ ] For string types: append text fence instructions to prompt
+  - [ ] For future types: support json fence instructions
+  - [ ] Make hints clear and concise for LLM
+
+### Testing
+
+- [ ] Integration test: Single think block
+  - [ ] Create test with think block returning string
+  - [ ] Mock agent response with markdown fence
+  - [ ] Verify value extracted correctly
+  - [ ] Verify interpreter completes successfully
+
+- [ ] Integration test: Think block in for-loop
+  - [ ] Test multiple think blocks in iterations
+  - [ ] Verify each iteration gets correct response
+  - [ ] Verify loop state preserved across blocks
+  - [ ] Verify all output files created
+
+- [ ] Integration test: Nested think blocks
+  - [ ] Outer think calls do(0), inner has another think
+  - [ ] Verify redirect actor routes messages correctly
+  - [ ] Verify both sessions complete successfully
+  - [ ] Verify call stack unwinding works
+
+---
+
+## Phase 6: Full Demo and Polish
+
+**Goal**: Complete interview sanitization demo and production polish
+
+**Success Criteria**: Full demo works end-to-end, robust error handling, good diagnostics
+
+### End-to-End Demo
+
+- [ ] Create interview sanitization test data
+  - [ ] Multiple interview directories with transcripts
+  - [ ] Realistic metadata.json files
+  - [ ] Transcripts with filler words and misspellings
+
+- [ ] Test full demo manually
+  - [ ] Run through Zed with real LLM
+  - [ ] Verify sanitized transcripts generated
+  - [ ] Verify output quality
+  - [ ] Test error handling (missing files, etc.)
 
 ### Error Handling
 
@@ -288,14 +402,14 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
   - [ ] Suggest fixes where possible
 
 - [ ] Improve runtime error messages
-  - [ ] Include stack trace showing call path
-  - [ ] Show variable values at error site
   - [ ] Clear error categories (type error, file not found, etc.)
+  - [ ] Include relevant context (variable values, file paths)
+  - [ ] Helpful suggestions for common errors
 
-- [ ] Convert uncaught exceptions to user messages
-  - [ ] Format exception as brief, clear error text
-  - [ ] Return as ACP response (not just logging)
-  - [ ] Clean up session state on error
+- [ ] Handle thread/channel errors gracefully
+  - [ ] Agent disconnection
+  - [ ] Channel send/receive failures
+  - [ ] Thread panic recovery
 
 ### Edge Cases
 
@@ -315,35 +429,44 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
   - [ ] Show exit code and stderr
   - [ ] Include command that failed
 
+- [ ] Handle concurrent evaluation attempts
+  - [ ] Return clear error if session already active
+  - [ ] Clean up properly on error or completion
+
 ### Documentation
 
 - [ ] Write README for patchwork-acp crate
   - [ ] Installation instructions
   - [ ] Zed configuration example
   - [ ] Basic usage examples
+  - [ ] Threading architecture overview
 
 - [ ] Write README for patchwork-eval crate
   - [ ] API documentation
   - [ ] Example of using interpreter directly
-  - [ ] Explanation of control states
+  - [ ] Explanation of threading model
+  - [ ] Agent integration guide
 
 - [ ] Create examples directory
   - [ ] Interview sanitization demo (with test data)
   - [ ] Simple think block examples
   - [ ] Loop examples
   - [ ] File I/O examples
+  - [ ] Nested think block example
 
 ### Integration Tests
 
 - [ ] Create mock agent for testing
   - [ ] Responds with predictable formatted responses
   - [ ] Can be configured per test case
+  - [ ] Simulates do() tool calls
 
 - [ ] Test suite for full scenarios
   - [ ] Various loop patterns
   - [ ] Nested data structures
   - [ ] Error conditions (file errors, parse errors, etc.)
   - [ ] Edge cases (empty loops, missing variables, etc.)
+  - [ ] Concurrent session handling
 
 ### Performance
 
@@ -352,16 +475,19 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
   - [ ] Optimize hot paths if needed
 
 - [ ] Memory usage analysis
-  - [ ] Ensure interpreter state doesn't grow unbounded
   - [ ] Verify session cleanup works correctly
+  - [ ] Check for channel/thread leaks
+  - [ ] Monitor agent thread resource usage
 
 ---
 
 ## Success Metrics
 
-**Phase 1 Complete**: Proxy runs in conductor, detects code, logs AST, forwards prompts
-**Phase 2 Complete**: Deterministic demo works (loops, file I/O, shell commands)
-**Phase 3 Complete**: Full demo works with think blocks and LLM integration
-**Phase 4 Complete**: Production-ready with robust errors, docs, and tests
+**Phase 1 Complete**: Proxy runs in conductor, detects code, logs AST, forwards prompts ✅
+**Phase 2 Complete**: Deterministic demo works (loops, file I/O, shell commands) ✅
+**Phase 3 Complete**: Evaluation uses `Result<Value, Error>`, ready for threading
+**Phase 4 Complete**: Agent infrastructure built, can create sessions and send prompts
+**Phase 5 Complete**: Interpreter threads block on agent, think blocks work end-to-end
+**Phase 6 Complete**: Production-ready with robust errors, docs, and tests
 
 **Final Demo**: User runs interview sanitization in Zed, gets sanitized transcripts in files

@@ -1,37 +1,35 @@
 {
-  "current_focus": "Phase 3 LLM Integration - Core evaluation refactoring complete",
+  "current_focus": "Architecture design finalized - Threading model for Patchwork ACP interpreter",
   "session_context": {
     "project": "patchwork",
-    "phase": "Phase 3: LLM Integration - Evaluation engine complete",
-    "last_work": "Refactored evaluation system to use ControlState throughout, enabling think block suspension"
+    "phase": "Phase 3 Planning - Architecture redesign",
+    "last_work": "Updated design documents to reflect threading-based execution model"
   },
   "completed_work": [
-    "Refactored entire evaluation system from Result<Value, Error> to Result<ControlState, Error>",
-    "Created try_eval! macro for clean control flow propagation (renamed from unwrap_or_propagate!)",
-    "Implemented eval_think_block() with prompt interpolation and variable binding collection",
-    "Added ControlState::Yield variant to suspend execution at think blocks",
-    "Made Interpreter, Runtime, and all related types Clone-able for session storage",
-    "Created test_think_block_yields() to verify suspension behavior",
-    "All 154 tests passing (up from 124)"
+    "Analyzed Niko Matsakis's threadbare prototype for suspend/resume patterns",
+    "Decided to eliminate ControlState in favor of synchronous blocking evaluation",
+    "Updated patchwork-acp-design.md with threading architecture",
+    "Updated patchwork-acp-implementation-plan.md with new phases 3-6",
+    "Documented agent infrastructure, redirect actor, and MCP do tool",
+    "Changed exception handling to Error::Exception(Value) with ? propagation"
   ],
-  "key_technical_decisions": [
-    "Used try_eval! macro pattern inspired by Rust's try! for control flow propagation",
-    "ControlState propagates through entire eval stack - Yield/Throw states bubble up immediately",
-    "Think blocks collect variable bindings for LLM context",
-    "Prompt interpolation supports $var, ${expr}, and embedded do {} blocks",
-    "Parser whitespace preservation is imperfect - noted for future improvement"
+  "key_architectural_decisions": [
+    "Use synchronous blocking interpreter threads instead of async/await",
+    "OS thread stack automatically preserves execution context during blocking",
+    "Agent runs in separate Tokio runtime, communicates via mpsc channels",
+    "Proxy spawns interpreter threads per evaluation, tracks active sessions in HashSet",
+    "No manual continuation management needed - thread blocking handles state",
+    "Exceptions modeled as Error::Exception(Value) for ? operator propagation"
   ],
   "next_steps": [
-    "Update ACP proxy to handle Yield states",
-    "Forward prompts to successor agent with type hints",
-    "Implement response extraction from markdown code fences",
-    "Implement resume() mechanism to continue execution with LLM response",
-    "Test think blocks in for-loops with state preservation",
-    "Write comprehensive integration tests"
+    "Phase 3: Refactor evaluation to Result<Value, Error>, remove ControlState",
+    "Phase 4: Build agent infrastructure (client loop, think_message, redirect actor)",
+    "Phase 5: Connect interpreter to agent with blocking channels",
+    "Phase 6: Complete demo and polish"
   ],
-  "patterns_noted": [
-    "try_eval! macro enables clean propagation without nested matches",
-    "Cloneable interpreter enables suspend/resume pattern",
-    "ControlState as return type rather than error enables coroutine semantics"
+  "design_references": [
+    "Niko Matsakis threadbare prototype: https://github.com/nikomatsakis/threadbare/",
+    "Local copy: docs/tmp/threadbare/",
+    "Key insight: Blocking on channels preserves call stack automatically"
   ]
 }

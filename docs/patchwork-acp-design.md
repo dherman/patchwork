@@ -4,7 +4,9 @@
 
 `patchwork-acp` is an ACP proxy that interprets Patchwork code embedded in user prompts, enabling a "supercharged prompting language" that blends deterministic control flow with nondeterministic LLM reasoning.
 
-**Architecture**: Interpreter-as-proxy middleware in SACP chain
+**Architecture**: Interpreter-as-proxy middleware in SACP chain with synchronous blocking evaluation
+
+**Key Design Decision**: The interpreter uses a synchronous, blocking execution model inspired by [Niko Matsakis's threadbare prototype](https://github.com/nikomatsakis/threadbare/). When evaluation hits a `think` block, it blocks on a channel waiting for the LLM response. The OS thread stack automatically preserves all execution context (local variables, call frames) while blocked. This eliminates the need for manual continuation management, async Rust in the evaluator, or explicit state machines.
 
 ```
 Zed (ACP client)
@@ -90,14 +92,7 @@ This design is focused on the **interview sanitization demo** as the first miles
 ```rust
 pub struct Interpreter {
     runtime: Runtime,
-    state: ControlState,
-}
-
-pub enum ControlState {
-    Eval,
-    Yield { op: LlmOp, prompt: String, bindings: Bindings, expect: Type },
-    Return(Value),
-    Throw(Value),
+    agent: Agent,
 }
 
 pub enum LlmOp {
@@ -106,11 +101,33 @@ pub enum LlmOp {
 }
 
 impl Interpreter {
-    pub fn new() -> Self;
-    pub fn eval(&mut self, code: &str) -> Result<ControlState>;
-    pub fn resume(&mut self, value: Value) -> Result<ControlState>;
+    pub fn new(agent: Agent) -> Self;
+
+    /// Evaluate Patchwork code synchronously.
+    /// Blocks at think/ask blocks until LLM responds.
+    /// Returns final value or error (including thrown exceptions).
+    pub fn eval(&mut self, code: &str) -> Result<Value, Error>;
 }
 ```
+
+**Threading Model:**
+
+The interpreter uses a synchronous, blocking execution model inspired by Niko Matsakis's threadbare prototype:
+
+- **Interpreter thread**: Runs evaluation synchronously, blocks at `think`/`ask` blocks
+- **Agent thread**: Async runtime that manages LLM sessions and SACP communication
+- **Communication**: `std::sync::mpsc` channels between interpreter and agent threads
+
+When evaluation hits a `think` block:
+1. Send `ThinkRequest { prompt, response_channel }` to agent thread
+2. Block on `response_channel.recv()`
+3. Agent creates LLM session, sends prompt, waits for response
+4. Agent sends response back through channel
+5. Interpreter unblocks and continues with the response value
+
+**Call stack preservation**: The OS thread stack automatically preserves all local variables and execution context while blocked. No manual continuation management needed.
+
+**Exception handling**: Patchwork exceptions (via `throw` keyword) are modeled as `Error::Exception(Value)` and propagate using Rust's `?` operator.
 
 ### 3. Runtime Implementation
 
@@ -148,29 +165,34 @@ The proxy intercepts prompt requests from the editor:
 - Otherwise, forward the prompt unchanged to the successor agent
 - All other ACP requests (initialize, newSession, etc.) are forwarded transparently
 
-### 3. Interpreter Executes Until Suspension
+### 3. Proxy Spawns Interpreter Thread
 
 When executing Patchwork code:
 
 1. Check if session already has active evaluation (error if yes)
-2. Create new interpreter instance
-3. Call `interpreter.eval(code)` which returns an `ControlState`:
-   - **Yield**: Hit a `think`/`ask` block - needs LLM
-   - **Return**: Code finished without needing LLM
-   - **Throw**: Runtime exception occurred
+2. Spawn a dedicated OS thread for this evaluation
+3. In the spawned thread:
+   - Create interpreter instance with shared agent handle
+   - Call `interpreter.eval(code)` which blocks until completion
+   - Interpreter communicates with agent thread via mpsc channels
+   - On `think`/`ask` blocks: send request to agent, block on response channel
+4. Proxy awaits completion via oneshot channel from interpreter thread
+5. On completion:
+   - Return value as ACP success response
+6. On error (including thrown exceptions):
+   - Return ACP error response with message
 
-4. On suspension:
-   - Interpolate variables into prompt text
-   - Add type hint formatting instructions
-   - Store interpreter state (session-scoped)
-   - Forward augmented prompt to successor agent
+### 4. Agent Thread Manages LLM Session
 
-5. On completion or error:
-   - Return appropriate ACP response
+The agent thread (running async Tokio runtime) handles think block requests:
 
-### 4. Agent Processes Think Block
+1. Receives `ThinkRequest` from interpreter thread via mpsc channel
+2. Creates new LLM session via SACP
+3. Sends prompt to LLM (e.g., claude-code-acp successor agent)
+4. Waits for LLM response asynchronously
+5. Sends response value back to interpreter thread via response channel
 
-The agent (e.g., claude-code-acp) receives a normal prompt request:
+The LLM receives a normal prompt request:
 
 ```json
 {
@@ -189,20 +211,124 @@ The agent (e.g., claude-code-acp) receives a normal prompt request:
 }
 ```
 
-### 5. Proxy Extracts Response and Resumes
+### 5. Agent Extracts Response and Unblocks Interpreter
 
-When the agent responds to the think block:
+When the LLM responds to the think block:
 
-1. Retrieve stored interpreter state for this session
-2. Extract typed value from agent response:
+1. Agent thread receives LLM response via SACP
+2. Extract typed value from response:
    - Look for markdown code fence with appropriate language marker (` ```text`, ` ```json`)
    - Parse content between fence markers
    - Fallback to full response text if no markers found
-3. Resume interpreter with extracted value
-4. Handle next state:
-   - **Yield**: Another think/ask block - store state and repeat cycle
-   - **Return**: All done - clean up session state, return success
-   - **Throw**: Clean up session state, return error response
+3. Send extracted value through response channel to interpreter thread
+4. Interpreter thread unblocks from `recv()` and continues evaluation
+5. If another `think` block is encountered, repeat the cycle
+6. When evaluation completes, interpreter thread sends final result to proxy
+7. Proxy returns ACP response to host
+
+## Threading Architecture
+
+### Overview
+
+The Patchwork ACP proxy uses a multi-threaded architecture inspired by Niko Matsakis's [threadbare prototype](https://github.com/nikomatsakis/threadbare/):
+
+```
+┌─────────────────────────────────────────────┐
+│ ACP Proxy (Tokio async runtime)             │
+│   - Receives/forwards ACP requests          │
+│   - Spawns interpreter threads per eval     │
+│   - Awaits completion via oneshot channels  │
+└─────────┬───────────────────────────────────┘
+          │
+          ├─ spawn ──────────────────────────┐
+          │                                   │
+┌─────────▼────────────────────────┐  ┌──────▼──────────────────────┐
+│ Interpreter Thread 1 (sync)      │  │ Interpreter Thread 2 (sync) │
+│   - eval_expr() blocks at think  │  │   - Independent evaluation  │
+│   - OS stack preserves locals    │  │   - Can run concurrently    │
+└─────────┬────────────────────────┘  └──────┬──────────────────────┘
+          │ mpsc                              │ mpsc
+          │                                   │
+          └─────────────┬─────────────────────┘
+                        │
+┌───────────────────────▼──────────────────────┐
+│ Agent (Tokio async runtime, shared)          │
+│   ┌──────────────────────────────────────┐  │
+│   │ Client Loop                          │  │
+│   │   - Receives ThinkRequests           │  │
+│   │   - Spawns think_message tasks       │  │
+│   └──────────────────────────────────────┘  │
+│                                              │
+│   ┌──────────────────────────────────────┐  │
+│   │ think_message task (per think block) │  │
+│   │   - Creates LLM session via SACP     │  │
+│   │   - Sends prompt to successor        │  │
+│   │   - Awaits LLM response              │  │
+│   │   - Extracts value, sends to interp  │  │
+│   └──────────────────────────────────────┘  │
+│                                              │
+│   ┌──────────────────────────────────────┐  │
+│   │ Redirect Actor (for nested thinks)   │  │
+│   │   - Maintains stack of active thinks │  │
+│   │   - Routes messages to top of stack  │  │
+│   └──────────────────────────────────────┘  │
+└──────────────────────────────────────────────┘
+```
+
+### Key Benefits
+
+1. **Simple evaluation code**: Interpreter stays synchronous, no async/await or manual continuations
+2. **Automatic state preservation**: OS thread stack preserves all local variables during blocking
+3. **Natural recursion**: Nested `think` blocks naturally create nested channel wait states
+4. **Concurrent sessions**: Multiple interpreter threads can run simultaneously for different sessions
+5. **Clean separation**: Sync interpreter logic separate from async agent/SACP communication
+
+### Communication Protocol
+
+**Interpreter → Agent:**
+```rust
+pub enum AgentRequest {
+    Think {
+        prompt: String,
+        bindings: Bindings,
+        expect: String,
+        response_tx: oneshot::Sender<Value>,
+    },
+    // Future: Ask variant for interactive prompts
+}
+```
+
+**Agent → Interpreter:**
+- Sends `Value` back through the `response_tx` oneshot channel
+- Interpreter unblocks from `response_tx.recv()` and continues
+
+### Nested Think Blocks
+
+When a think block's LLM response contains a `do` tool call, it can trigger recursive evaluation:
+
+```patchwork
+var result = think {
+  Categorize this document. Call do(0) if RECEIPT.
+}
+```
+
+The LLM calls `do(0)`, which executes `children[0]`, which might contain another think block. The agent's redirect actor maintains a stack of active `think_message` tasks and routes incoming messages to the top of the stack, ensuring nested sessions don't interfere.
+
+**Call stack during nested think:**
+```
+Interpreter thread:
+  eval_expr(outer Think)
+    └─ eval_think_block()
+         └─ agent_tx.send(ThinkRequest { ... })
+         └─ response_rx.recv() ← BLOCKED
+              └─ [LLM calls do(0)]
+                   └─ eval_expr(children[0])  // Recursive call
+                        └─ eval_think_block()  // Inner think
+                             └─ agent_tx.send(ThinkRequest { ... })
+                             └─ response_rx.recv() ← BLOCKED (nested)
+```
+
+Both `recv()` calls are on the same thread stack, preserving all execution context.
 
 ## Design Principles
 
@@ -371,11 +497,11 @@ Shell commands execute immediately in the user's working directory. If the user 
 
 ## State Management
 
-### Session-Scoped Interpreter Storage
+### Session-Scoped Evaluation Tracking
 
 **Decision**: One active evaluation per ACP session
 
-The proxy maintains a `HashMap<SessionId, Interpreter>` to track suspended evaluations. Each session can have at most one active Patchwork evaluation.
+The proxy tracks active evaluations per session to prevent concurrent Patchwork execution. Each session can have at most one active evaluation thread.
 
 **Rationale:**
 - Avoids implicit concurrency (aligns with scripting language philosophy)
@@ -384,12 +510,14 @@ The proxy maintains a `HashMap<SessionId, Interpreter>` to track suspended evalu
 - Easy cleanup on session end
 
 **Behavior:**
-- If user sends new Patchwork code while an evaluation is suspended, return error:
+- If user sends new Patchwork code while an evaluation is running, return error:
   ```
   Error: Cannot start new Patchwork evaluation while another is in progress
   ```
-- On completion or error, clean up session state immediately
-- On session end (user closes agent), clean up any suspended evaluations
+- On completion or error, mark session as available for new evaluations
+- On session end (user closes agent), abort any running evaluation threads
+
+**Implementation**: The proxy maintains a `HashSet<SessionId>` of sessions with active evaluations. No need to store interpreter instances—the thread stack preserves all execution state while blocked.
 
 **Future consideration**: As Patchwork evolves, we may revisit this to support a stack of nested evaluations, as well as explicit concurrency primitives. For now, we are limiting the design to the minimal functionality necessary for a first demo.
 
@@ -397,15 +525,16 @@ The proxy maintains a `HashMap<SessionId, Interpreter>` to track suspended evalu
 
 ```rust
 struct PatchworkProxy {
-    // Session-scoped interpreter storage
-    active_evaluations: Arc<Mutex<HashMap<SessionId, Interpreter>>>,
+    // Track which sessions have active evaluations
+    active_sessions: Arc<Mutex<HashSet<SessionId>>>,
+    // Shared agent handle for all interpreter threads
+    agent: Agent,
 }
 
 impl PatchworkProxy {
-    fn has_active_evaluation(&self, session_id: SessionId) -> bool;
-    fn store_interpreter(&self, session_id: SessionId, interp: Interpreter);
-    fn retrieve_interpreter(&self, session_id: SessionId) -> Result<Interpreter>;
-    fn remove_interpreter(&self, session_id: SessionId);
+    fn has_active_evaluation(&self, session_id: &SessionId) -> bool;
+    fn mark_session_active(&self, session_id: SessionId);
+    fn mark_session_inactive(&self, session_id: &SessionId);
 }
 ```
 
