@@ -1,0 +1,19 @@
+Carol Nichols: Welcome to Rustacean Station! Today I'm, um, really excited to have two amazing guests from the Rust team. Could you introduce yourselves?
+
+Niko Matsakis: Thanks Carol! I'm Niko Matsakis, uh, and I work on the Rust compiler team. I've been, like, involved with Rust since... oh, around 2013 I think?
+
+Aaron Turon: And I'm Aron Turon - I lead the Rust libraries team. I've been, um, working on Rust for about eight years now.
+
+Carol Nichols: So Niko, can you tell us about, uh, the new trait solver you've been working on?
+
+Niko Matsakis: Sure! So, um, the new trait solver is really exciting. It's, like, a complete rewrite of how we handle type inference and, uh, trait resolution. The key insight is that we can, you know, use a more declarative approach.
+
+Aaron Turon: Yeah, and this is, um, related to the work we did on chalk. Niko has been, like, instrumental in bringing those ideas into rustc.
+
+Carol Nichols: That sounds fascinating. Aron, how does this affect the standard library work?
+
+Aaron Turon: Well, um, one thing we've been doing is, like, reviewing all the APIs to make sure they work well with the new solver. There are, uh, some edge cases where the old solver was more permissive.
+
+Niko Matsakis: Right, and we've been, um, careful to ensure backwards compatibility. The goal is that, like, existing code should just work.
+
+Carol Nichols: Thank you both so much for joining us! This was, um, really informative.

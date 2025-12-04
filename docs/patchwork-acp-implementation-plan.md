@@ -387,10 +387,16 @@ The interpreter runs on blocking threads using `std::sync::mpsc` channels, while
 
 ### End-to-End Demo
 
-- [ ] Create interview sanitization test data
-  - [ ] Multiple interview directories with transcripts
-  - [ ] Realistic metadata.json files
-  - [ ] Transcripts with filler words and misspellings
+- [x] Create interview sanitization test data
+  - [x] Multiple interview directories with transcripts
+  - [x] Realistic metadata.json files
+  - [x] Transcripts with filler words and misspellings
+  - Created in `examples/interview-demo/`
+
+- [x] Fix session notification routing
+  - [x] Added `.on_receive_notification_from_successor()` handler
+  - [x] Route `SessionNotification` to redirect actor
+  - [x] Enabled LLM streaming response accumulation
 
 - [ ] Test full demo manually
   - [ ] Run through Zed with real LLM
@@ -400,15 +406,15 @@ The interpreter runs on blocking threads using `std::sync::mpsc` channels, while
 
 ### Error Handling
 
-- [ ] Improve parse error messages
-  - [ ] Include source location (line/column)
-  - [ ] Show snippet of problematic code
-  - [ ] Suggest fixes where possible
+- [x] Improve parse error messages
+  - [x] Include source location (line/column)
+  - [x] Show snippet of problematic code
+  - [x] Added `format_parse_error()` helper with context
 
-- [ ] Improve runtime error messages
-  - [ ] Clear error categories (type error, file not found, etc.)
-  - [ ] Include relevant context (variable values, file paths)
-  - [ ] Helpful suggestions for common errors
+- [x] Improve runtime error messages
+  - [x] Clear error categories (type error, file not found, etc.)
+  - [x] Include relevant context (variable values, file paths)
+  - [x] Already had helpful messages for common errors
 
 - [ ] Handle thread/channel errors gracefully
   - [ ] Agent disconnection

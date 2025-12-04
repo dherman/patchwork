@@ -9,13 +9,16 @@ mod agent;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use sacp::schema::{ContentBlock, PromptRequest, PromptResponse, StopReason};
+use sacp::schema::{ContentBlock, PromptRequest, PromptResponse, SessionNotification, StopReason};
 use sacp::{JrHandlerChain, JrRequestCx};
 use sacp_proxy::{AcpProxyExt, JrCxExt, McpServiceRegistry};
+use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 use tracing_subscriber::EnvFilter;
 
 use patchwork_eval::{AgentHandle, Error as EvalError, Interpreter};
+
+use crate::agent::{PerSessionMessage, RedirectMessage};
 
 /// The Patchwork proxy state.
 struct PatchworkProxy {
@@ -23,6 +26,8 @@ struct PatchworkProxy {
     active_sessions: HashSet<String>,
     /// Agent handle for think blocks.
     agent_handle: Option<AgentHandle>,
+    /// Redirect channel for routing session notifications to think blocks.
+    redirect_tx: Option<UnboundedSender<RedirectMessage>>,
 }
 
 impl PatchworkProxy {
@@ -30,6 +35,7 @@ impl PatchworkProxy {
         Self {
             active_sessions: HashSet::new(),
             agent_handle: None,
+            redirect_tx: None,
         }
     }
 
@@ -45,12 +51,17 @@ impl PatchworkProxy {
         self.active_sessions.remove(session_id);
     }
 
-    fn set_agent_handle(&mut self, handle: AgentHandle) {
+    fn set_agent(&mut self, handle: AgentHandle, redirect_tx: UnboundedSender<RedirectMessage>) {
         self.agent_handle = Some(handle);
+        self.redirect_tx = Some(redirect_tx);
     }
 
     fn agent_handle(&self) -> Option<AgentHandle> {
         self.agent_handle.clone()
+    }
+
+    fn redirect_tx(&self) -> Option<UnboundedSender<RedirectMessage>> {
+        self.redirect_tx.clone()
     }
 }
 
@@ -205,6 +216,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Build the handler chain
     let proxy_clone = Arc::clone(&proxy);
+    let proxy_for_notifs = Arc::clone(&proxy);
     JrHandlerChain::new()
         .name("patchwork-acp")
         .on_receive_request(move |request: PromptRequest, cx: JrRequestCx<PromptResponse>| {
@@ -213,6 +225,18 @@ async fn main() -> anyhow::Result<()> {
                 // Create agent on first request if not already created
                 ensure_agent_created(&proxy, cx.connection_cx().clone());
                 handle_prompt(proxy, request, cx).await
+            }
+        })
+        // Route session notifications from successor to active think blocks
+        .on_receive_notification_from_successor({
+            async move |notification: SessionNotification, _cx| {
+                // Route to redirect actor if we have one
+                if let Some(redirect_tx) = proxy_for_notifs.lock().unwrap().redirect_tx() {
+                    let _ = redirect_tx.send(RedirectMessage::IncomingMessage(
+                        PerSessionMessage::SessionNotification(notification),
+                    ));
+                }
+                Ok(())
             }
         })
         .provide_mcp(mcp_registry)
@@ -232,8 +256,8 @@ fn ensure_agent_created(proxy: &Arc<Mutex<PatchworkProxy>>, cx: sacp::JrConnecti
     let mut proxy = proxy.lock().unwrap();
     if proxy.agent_handle.is_none() {
         let mcp_registry = McpServiceRegistry::default();
-        let (agent_handle, _redirect_tx) = agent::create_agent(cx, mcp_registry);
-        proxy.set_agent_handle(agent_handle);
+        let (agent_handle, redirect_tx) = agent::create_agent(cx, mcp_registry);
+        proxy.set_agent(agent_handle, redirect_tx);
         tracing::info!("Agent created and connected to successor");
     }
 }

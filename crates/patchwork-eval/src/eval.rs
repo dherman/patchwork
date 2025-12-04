@@ -766,7 +766,14 @@ fn eval_shell_redirect(
                 .map_err(|e| Error::Runtime(format!("Failed to read {}: {}", path.display(), e)))?;
 
             // Check if the command is 'json' for JSON parsing
-            if let Expr::Identifier("json") = command {
+            // Can be either Identifier("json") or BareCommand { name: "json", args: [] }
+            let is_json_command = match command {
+                Expr::Identifier("json") => true,
+                Expr::BareCommand { name: "json", args } if args.is_empty() => true,
+                _ => false,
+            };
+
+            if is_json_command {
                 let value = Value::from_json(&contents).map_err(Error::Runtime)?;
                 return Ok(value);
             }

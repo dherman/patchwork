@@ -1,50 +1,39 @@
 {
-  "current_focus": "Phase 5 complete - Interpreter-agent integration done",
+  "current_focus": "Phase 6 in progress - Manual testing in Zed",
   "session_context": {
     "project": "patchwork",
-    "phase": "Phase 5 Complete - Ready for Phase 6",
-    "last_work": "Connected interpreter to agent with blocking channels"
+    "phase": "Phase 6 - Demo and Polish",
+    "last_work": "Fixed json redirect syntax, updated demo to use read()+json()"
   },
   "completed_work": [
-    "Created agent.rs module in patchwork-eval with ThinkRequest, ThinkResponse, AgentHandle",
-    "Updated Interpreter to accept optional AgentHandle",
-    "Added with_agent() constructor for LLM-connected interpreters",
-    "Updated all eval functions to accept Option<&AgentHandle> parameter",
-    "Implemented eval_think_block() to block on agent channel when agent present",
-    "Handles ThinkResponse::Do (placeholder) and ThinkResponse::Complete",
-    "Refactored patchwork-acp/agent.rs to use patchwork-eval types",
-    "Created create_agent() function returning (AgentHandle, redirect_tx)",
-    "Implemented bridge_task() to receive from std::sync::mpsc via spawn_blocking",
-    "Updated proxy main.rs to create agent lazily on first request",
-    "Changed session tracking from HashMap<SessionId, Session> to HashSet<SessionId>",
-    "Interpreter now runs on spawn_blocking thread for proper blocking",
-    "All 287 tests pass across workspace",
-    "Updated implementation plan to mark Phase 5 complete"
+    "Created interview sanitization test data in examples/interview-demo/",
+    "Fixed session notification routing - added .on_receive_notification_from_successor()",
+    "Improved parse error messages with line/column and source snippets",
+    "Fixed BareCommand handling for json < file redirect syntax",
+    "Updated sanitize.pw to use read()+json() pattern instead of redirect",
+    "All tests passing (287 across workspace)"
   ],
-  "key_architectural_decisions": [
-    "patchwork_eval defines the interface (ThinkRequest, ThinkResponse, AgentHandle)",
-    "patchwork_acp implements the bridge between blocking and async worlds",
-    "AgentHandle wraps std::sync::mpsc::Sender<ThinkRequest>",
-    "bridge_task uses spawn_blocking to receive from sync channel",
-    "Agent created lazily via ensure_agent_created() on first request",
-    "Interpreter runs on spawn_blocking thread, can block on channels"
-  ],
-  "next_steps": [
-    "Phase 6: Full demo and polish",
-    "Create interview sanitization test data",
-    "Test with real LLM end-to-end",
-    "Improve error messages",
-    "Add documentation"
-  ],
-  "files_created": [
-    "crates/patchwork-eval/src/agent.rs - ThinkRequest, ThinkResponse, AgentHandle"
+  "key_fixes_this_session": [
+    "json < file was parsed as binary comparison, not redirect - outside shell mode",
+    "BareCommand { name: json } wasn't being recognized in eval_shell_redirect",
+    "Updated example to use read()+json() which works outside shell mode"
   ],
   "files_modified": [
-    "crates/patchwork-eval/src/lib.rs - Export agent types",
-    "crates/patchwork-eval/src/interpreter.rs - Add optional AgentHandle",
-    "crates/patchwork-eval/src/eval.rs - Pass agent through all eval functions",
-    "crates/patchwork-acp/src/agent.rs - Refactored to use patchwork-eval types",
-    "crates/patchwork-acp/src/main.rs - Simplified session tracking, lazy agent creation",
-    "docs/patchwork-acp-implementation-plan.md - Marked Phase 5 complete"
+    "crates/patchwork-eval/src/interpreter.rs - Added format_parse_error() helper",
+    "crates/patchwork-eval/src/eval.rs - Fixed BareCommand matching for json redirect",
+    "crates/patchwork-acp/src/main.rs - Added notification routing, redirect_tx tracking",
+    "examples/interview-demo/sanitize.pw - Updated to use read()+json()",
+    "docs/patchwork-acp-implementation-plan.md - Marked Phase 6 items complete"
+  ],
+  "next_steps": [
+    "Continue manual testing in Zed with real LLM",
+    "Debug any issues that arise during testing",
+    "Handle remaining edge cases",
+    "Write documentation"
+  ],
+  "testing_notes": [
+    "Binary at /Users/dherman/Code/patchwork/target/release/patchwork-acp",
+    "Zed config needs sacp-conductor pointing to patchwork-acp then claude-code-acp",
+    "Test with examples/interview-demo/sanitize.pw"
   ]
 }

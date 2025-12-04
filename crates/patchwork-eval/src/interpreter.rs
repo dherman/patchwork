@@ -100,7 +100,7 @@ impl Interpreter {
                 self.execute_program(&ast)
             }
             Err(e) => {
-                let msg = format!("{:?}", e);
+                let msg = format_parse_error(&e, code_to_parse);
                 Err(Error::Parse(msg))
             }
         }
@@ -147,6 +147,64 @@ impl Default for Interpreter {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Format a parse error with source context.
+fn format_parse_error(error: &patchwork_parser::ParseError, source: &str) -> String {
+    use patchwork_parser::ParseError;
+
+    let (message, span) = match error {
+        ParseError::LexerError { message, span, .. } => (message.clone(), *span),
+        ParseError::UnexpectedToken { message, span, .. } => (message.clone(), *span),
+    };
+
+    // If we have a span, add line/column information and a source snippet
+    if let Some((start, end)) = span {
+        let (line, col) = byte_offset_to_line_col(source, start);
+        let source_line = get_source_line(source, line);
+
+        // Build error message with context
+        let mut result = format!("at line {}, column {}: {}\n", line, col, message);
+
+        // Add the source line
+        result.push_str(&format!("  {}\n", source_line));
+
+        // Add the error indicator
+        let spaces = " ".repeat(col.saturating_sub(1) + 2);
+        let carets = "^".repeat((end - start).max(1));
+        result.push_str(&format!("{}{}", spaces, carets));
+
+        result
+    } else {
+        message
+    }
+}
+
+/// Convert a byte offset to line and column numbers (1-indexed).
+fn byte_offset_to_line_col(source: &str, offset: usize) -> (usize, usize) {
+    let mut line = 1;
+    let mut line_start = 0;
+
+    for (i, c) in source.char_indices() {
+        if i >= offset {
+            break;
+        }
+        if c == '\n' {
+            line += 1;
+            line_start = i + 1;
+        }
+    }
+
+    let col = offset - line_start + 1;
+    (line, col)
+}
+
+/// Get the source line at the given line number (1-indexed).
+fn get_source_line(source: &str, line_num: usize) -> &str {
+    source
+        .lines()
+        .nth(line_num.saturating_sub(1))
+        .unwrap_or("")
 }
 
 #[cfg(test)]
@@ -221,6 +279,33 @@ mod tests {
         let path = file.path().to_str().unwrap();
 
         let mut interp = Interpreter::new();
+        let code = format!(r#"{{
+            var text = read("{}")
+            var data = json(text)
+            data.name
+        }}"#, path);
+
+        let result = interp.eval(&code);
+        assert!(result.is_ok(), "Eval failed: {:?}", result);
+        if let Ok(Value::String(s)) = result {
+            assert_eq!(s, "test");
+        } else {
+            panic!("Expected String(\"test\"), got {:?}", result);
+        }
+    }
+
+    #[test]
+    fn test_eval_json_with_read() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Create a temp file with JSON content
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, r#"{{"name": "test", "value": 123}}"#).unwrap();
+        let path = file.path().to_str().unwrap();
+
+        let mut interp = Interpreter::new();
+        // Test using read() + json() - the standard pattern
         let code = format!(r#"{{
             var text = read("{}")
             var data = json(text)

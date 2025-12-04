@@ -1,0 +1,19 @@
+Steve Klabnik: Hello and welcome! Today we're, um, talking about the Rust community and, uh, documentation. I have two wonderful guests with me.
+
+Manish Goregaokar: Hi! I'm Mannish Goregaokar. I work on, um, a bunch of things - Servo, Unicode, and uh, various Rust tooling projects.
+
+Ashley Williams: And I'm Ashely Williams! I'm, like, super passionate about WebAssembly and developer experience. I also help organize, um, RustConf.
+
+Steve Klabnik: Manish, you've done, uh, so much work on Clippy. Can you tell us about it?
+
+Manish Goregaokar: Sure! So Clippy is, um, our linting tool. The idea is to, like, catch common mistakes before they become bugs. We have, uh, hundreds of lints now.
+
+Ashley Williams: The thing I love about Clippy is, um, how educational it is. Like, the error messages don't just tell you what's wrong, they, you know, teach you better patterns.
+
+Steve Klabnik: Ashely, how does this tie into your work on, uh, wasm-pack?
+
+Ashley Williams: Great question! So wasm-pack is, like, our tool for building WebAssembly packages. We tried to, um, apply the same philosophy - helpful errors, sensible defaults.
+
+Manish Goregaokar: And the, uh, integration between these tools is really nice. You can run Clippy on your wasm projects and, like, get feedback specific to that domain.
+
+Steve Klabnik: Thanks so much for joining! This was, um, really great.
