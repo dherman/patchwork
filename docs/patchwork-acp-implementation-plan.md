@@ -192,7 +192,7 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
 
 ---
 
-## Phase 3: Threading Infrastructure Refactor
+## Phase 3: Threading Infrastructure Refactor ✅
 
 **Goal**: Refactor evaluation to use synchronous blocking model with threading
 
@@ -200,32 +200,32 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
 
 ### Remove ControlState System
 
-- [ ] Simplify evaluation return types
-  - [ ] Change `eval_expr()` from `Result<ControlState, Error>` to `Result<Value, Error>`
-  - [ ] Change `eval_statement()` to return `Result<Value, Error>`
-  - [ ] Change `eval_block()` to return `Result<Value, Error>`
-  - [ ] Remove `ControlState` enum entirely
-  - [ ] Remove `try_eval!` macro
+- [x] Simplify evaluation return types
+  - [x] Change `eval_expr()` from `Result<ControlState, Error>` to `Result<Value, Error>`
+  - [x] Change `eval_statement()` to return `Result<Value, Error>`
+  - [x] Change `eval_block()` to return `Result<Value, Error>`
+  - [x] Remove `ControlState` enum entirely
+  - [x] Remove `try_eval!` macro
 
-- [ ] Update exception handling
-  - [ ] Add `Error::Exception(Value)` variant
-  - [ ] Change `throw` evaluation to return `Err(Error::Exception(value))`
-  - [ ] Update all error propagation to use `?` operator
-  - [ ] Verify exceptions propagate correctly through call stack
+- [x] Update exception handling
+  - [x] Add `Error::Exception(Value)` variant
+  - [x] Change `throw` evaluation to return `Err(Error::Exception(value))`
+  - [x] Update all error propagation to use `?` operator
+  - [x] Verify exceptions propagate correctly through call stack
 
-- [ ] Update interpreter API
-  - [ ] Change `Interpreter::eval()` to return `Result<Value, Error>`
-  - [ ] Remove `Interpreter::resume()` method
-  - [ ] Remove `state` field from `Interpreter`
-  - [ ] Update all tests to use new signatures
+- [x] Update interpreter API
+  - [x] Change `Interpreter::eval()` to return `Result<Value, Error>`
+  - [x] Remove `Interpreter::resume()` method
+  - [x] Remove `state` field from `Interpreter`
+  - [x] Update all tests to use new signatures
 
 ### Testing
 
-- [ ] Update all existing tests for new signatures
-  - [ ] Change assertions from `ControlState::Return(value)` to `Ok(value)`
-  - [ ] Update error handling tests for `Error::Exception`
-- [ ] Verify all 154 tests still pass
-- [ ] Add test for exception propagation through nested calls
+- [x] Update all existing tests for new signatures
+  - [x] Change assertions from `ControlState::Return(value)` to `Ok(value)`
+  - [x] Update error handling tests for `Error::Exception`
+- [x] Verify all tests still pass (279 tests across workspace)
+- [x] Add test for exception propagation through nested calls
 
 ---
 
@@ -485,7 +485,7 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
 
 **Phase 1 Complete**: Proxy runs in conductor, detects code, logs AST, forwards prompts ✅
 **Phase 2 Complete**: Deterministic demo works (loops, file I/O, shell commands) ✅
-**Phase 3 Complete**: Evaluation uses `Result<Value, Error>`, ready for threading
+**Phase 3 Complete**: Evaluation uses `Result<Value, Error>`, ready for threading ✅
 **Phase 4 Complete**: Agent infrastructure built, can create sessions and send prompts
 **Phase 5 Complete**: Interpreter threads block on agent, think blocks work end-to-end
 **Phase 6 Complete**: Production-ready with robust errors, docs, and tests

@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use crate::value::Value;
+
 /// Errors that can occur during interpretation.
 #[derive(Debug, Clone)]
 pub enum Error {
@@ -9,8 +11,9 @@ pub enum Error {
     Parse(String),
     /// A runtime error occurred.
     Runtime(String),
-    /// Resume called when not in Yield state.
-    InvalidResume,
+    /// A Patchwork exception was thrown (via `throw` keyword).
+    /// This propagates up the call stack using Rust's `?` operator.
+    Exception(Value),
 }
 
 impl fmt::Display for Error {
@@ -18,7 +21,7 @@ impl fmt::Display for Error {
         match self {
             Error::Parse(msg) => write!(f, "Parse error: {}", msg),
             Error::Runtime(msg) => write!(f, "Runtime error: {}", msg),
-            Error::InvalidResume => write!(f, "Cannot resume: interpreter is not in Yield state"),
+            Error::Exception(value) => write!(f, "Exception: {}", value.to_string_value()),
         }
     }
 }

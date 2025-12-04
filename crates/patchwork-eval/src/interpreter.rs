@@ -1,6 +1,9 @@
-//! The Patchwork interpreter with suspend/resume capability.
+//! The Patchwork interpreter.
+//!
+//! This module provides a synchronous interpreter for Patchwork code.
+//! Think blocks will block on channel operations in Phase 5 when the
+//! agent infrastructure is connected.
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use patchwork_parser::ast::{Expr, Statement};
@@ -10,75 +13,20 @@ use crate::eval;
 use crate::runtime::Runtime;
 use crate::value::Value;
 
-/// Variable bindings passed to an LLM operation.
-pub type Bindings = HashMap<String, Value>;
-
-/// The type of LLM operation being requested.
-#[derive(Debug, Clone, PartialEq)]
-pub enum LlmOp {
-    /// A `think { ... }` block - LLM processes and returns a value.
-    Think,
-    /// An `ask { ... }` block - interactive prompt (future).
-    Ask,
-}
-
-/// The control state of the interpreter.
-///
-/// This enum represents the current execution state, inspired by
-/// generator/coroutine semantics where execution can suspend and resume.
-#[derive(Debug, Clone)]
-pub enum ControlState {
-    /// The interpreter is ready to evaluate or currently evaluating.
-    Eval,
-
-    /// The interpreter has suspended, waiting for an LLM response.
-    Yield {
-        /// The type of LLM operation.
-        op: LlmOp,
-        /// The interpolated prompt text to send to the LLM.
-        prompt: String,
-        /// Variable bindings available in the prompt context.
-        bindings: Bindings,
-        /// Description of the expected response type.
-        expect: String,
-    },
-
-    /// The interpreter has completed successfully with a value.
-    Return(Value),
-
-    /// The interpreter has thrown an exception.
-    Throw(Value),
-}
-
-impl ControlState {
-    /// Check if the interpreter is in a terminal state (Return or Throw).
-    pub fn is_terminal(&self) -> bool {
-        matches!(self, ControlState::Return(_) | ControlState::Throw(_))
-    }
-
-    /// Check if the interpreter is yielding, waiting for LLM input.
-    pub fn is_yield(&self) -> bool {
-        matches!(self, ControlState::Yield { .. })
-    }
-}
-
 /// The Patchwork interpreter.
 ///
-/// Executes Patchwork code with the ability to suspend at `think` blocks,
-/// allowing external systems to provide LLM responses before resuming.
+/// Executes Patchwork code synchronously. In Phase 5, think blocks will
+/// block on channel operations waiting for LLM responses.
 #[derive(Debug, Clone)]
 pub struct Interpreter {
-    /// Current control state.
-    state: ControlState,
     /// Runtime environment with variable bindings.
     runtime: Runtime,
 }
 
 impl Interpreter {
-    /// Create a new interpreter in the Eval state.
+    /// Create a new interpreter.
     pub fn new() -> Self {
         Self {
-            state: ControlState::Eval,
             runtime: Runtime::default(),
         }
     }
@@ -86,7 +34,6 @@ impl Interpreter {
     /// Create a new interpreter with a specific working directory.
     pub fn with_working_dir(working_dir: PathBuf) -> Self {
         Self {
-            state: ControlState::Eval,
             runtime: Runtime::new(working_dir),
         }
     }
@@ -101,19 +48,12 @@ impl Interpreter {
         &mut self.runtime
     }
 
-    /// Get the current control state.
-    pub fn state(&self) -> &ControlState {
-        &self.state
-    }
-
     /// Evaluate Patchwork code.
     ///
-    /// Parses and executes the code, returning the resulting control state.
-    /// If the code contains `think` blocks, the interpreter may yield,
-    /// requiring a call to `resume()` with the LLM's response.
+    /// Parses and executes the code, returning the final value or an error.
     ///
     /// For ACP usage, code starting with `{` is wrapped in a skill for execution.
-    pub fn eval(&mut self, code: &str) -> crate::Result<&ControlState> {
+    pub fn eval(&mut self, code: &str) -> crate::Result<Value> {
         // For ACP, bare blocks `{ ... }` need to be wrapped in a skill to be valid
         let wrapped_code;
         let code_to_parse = if code.trim_start().starts_with('{') {
@@ -129,28 +69,17 @@ impl Interpreter {
                 eprintln!("[patchwork-eval] Parsed AST: {:?}", ast);
 
                 // Execute the program - look for the __main__ skill or evaluate items
-                match self.execute_program(&ast) {
-                    Ok(state) => {
-                        self.state = state;
-                        Ok(&self.state)
-                    }
-                    Err(e) => {
-                        let msg = e.to_string();
-                        self.state = ControlState::Throw(Value::String(msg.clone()));
-                        Err(e)
-                    }
-                }
+                self.execute_program(&ast)
             }
             Err(e) => {
                 let msg = format!("{:?}", e);
-                self.state = ControlState::Throw(Value::String(msg.clone()));
                 Err(Error::Parse(msg))
             }
         }
     }
 
     /// Execute a parsed program.
-    fn execute_program(&mut self, program: &patchwork_parser::Program) -> crate::Result<ControlState> {
+    fn execute_program(&mut self, program: &patchwork_parser::Program) -> crate::Result<Value> {
         use patchwork_parser::Item;
 
         // Look for __main__ skill (from wrapped block) or execute items
@@ -176,27 +105,13 @@ impl Interpreter {
     }
 
     /// Evaluate a single expression directly (for testing).
-    pub fn eval_expr(&mut self, expr: &Expr) -> crate::Result<ControlState> {
+    pub fn eval_expr(&mut self, expr: &Expr) -> crate::Result<Value> {
         eval::eval_expr(expr, &mut self.runtime)
     }
 
     /// Evaluate a single statement directly (for testing).
-    pub fn eval_stmt(&mut self, stmt: &Statement) -> crate::Result<ControlState> {
+    pub fn eval_stmt(&mut self, stmt: &Statement) -> crate::Result<Value> {
         eval::eval_statement(stmt, &mut self.runtime)
-    }
-
-    /// Resume execution after an LLM response.
-    ///
-    /// This should only be called when the interpreter is in the `Yield` state.
-    /// The provided value is the LLM's response, which becomes the result of
-    /// the `think` block that caused the yield.
-    pub fn resume(&mut self, _value: Value) -> crate::Result<&ControlState> {
-        if !self.state.is_yield() {
-            return Err(Error::InvalidResume);
-        }
-
-        // Phase 1 stub - not yet implemented
-        Err(Error::Runtime("resume not yet implemented".to_string()))
     }
 }
 
@@ -212,8 +127,8 @@ mod tests {
 
     #[test]
     fn test_new_interpreter() {
-        let interp = Interpreter::new();
-        assert!(matches!(interp.state(), ControlState::Eval));
+        let _interp = Interpreter::new();
+        // Interpreter is ready to evaluate
     }
 
     #[test]
@@ -222,7 +137,6 @@ mod tests {
         // Empty program is valid Patchwork
         let result = interp.eval("");
         assert!(result.is_ok());
-        assert!(matches!(interp.state(), ControlState::Return(_)));
     }
 
     #[test]
@@ -231,14 +145,6 @@ mod tests {
         // A simple function definition
         let result = interp.eval("fun hello() {}");
         assert!(result.is_ok());
-        assert!(matches!(interp.state(), ControlState::Return(_)));
-    }
-
-    #[test]
-    fn test_resume_without_yield() {
-        let mut interp = Interpreter::new();
-        let result = interp.resume(Value::Null);
-        assert!(matches!(result, Err(Error::InvalidResume)));
     }
 
     #[test]
@@ -250,10 +156,10 @@ mod tests {
         }"#;
         let result = interp.eval(code);
         assert!(result.is_ok(), "Eval failed: {:?}", result);
-        if let ControlState::Return(Value::Number(n)) = interp.state() {
-            assert_eq!(*n, 42.0);
+        if let Ok(Value::Number(n)) = result {
+            assert_eq!(n, 42.0);
         } else {
-            panic!("Expected Return(Number(42)), got {:?}", interp.state());
+            panic!("Expected Number(42), got {:?}", result);
         }
     }
 
@@ -269,10 +175,10 @@ mod tests {
         }"#;
         let result = interp.eval(code);
         assert!(result.is_ok(), "Eval failed: {:?}", result);
-        if let ControlState::Return(Value::Number(n)) = interp.state() {
-            assert_eq!(*n, 6.0);
+        if let Ok(Value::Number(n)) = result {
+            assert_eq!(n, 6.0);
         } else {
-            panic!("Expected Return(Number(6)), got {:?}", interp.state());
+            panic!("Expected Number(6), got {:?}", result);
         }
     }
 
@@ -295,10 +201,10 @@ mod tests {
 
         let result = interp.eval(&code);
         assert!(result.is_ok(), "Eval failed: {:?}", result);
-        if let ControlState::Return(Value::String(s)) = interp.state() {
+        if let Ok(Value::String(s)) = result {
             assert_eq!(s, "test");
         } else {
-            panic!("Expected Return(String(\"test\")), got {:?}", interp.state());
+            panic!("Expected String(\"test\"), got {:?}", result);
         }
     }
 
@@ -311,11 +217,11 @@ mod tests {
         }"#;
         let result = interp.eval(code);
         assert!(result.is_ok(), "Eval failed: {:?}", result);
-        if let ControlState::Return(Value::String(s)) = interp.state() {
+        if let Ok(Value::String(s)) = result {
             assert!(s.contains("\"name\""));
             assert!(s.contains("\"hello\""));
         } else {
-            panic!("Expected Return(String), got {:?}", interp.state());
+            panic!("Expected String, got {:?}", result);
         }
     }
 
@@ -329,10 +235,10 @@ mod tests {
         }"#;
         let result = interp.eval(code);
         assert!(result.is_ok(), "Eval failed: {:?}", result);
-        if let ControlState::Return(Value::Number(n)) = interp.state() {
-            assert_eq!(*n, 30.0);
+        if let Ok(Value::Number(n)) = result {
+            assert_eq!(n, 30.0);
         } else {
-            panic!("Expected Return(Number(30)), got {:?}", interp.state());
+            panic!("Expected Number(30), got {:?}", result);
         }
     }
 
@@ -349,10 +255,10 @@ mod tests {
         }"#;
         let result = interp.eval(code);
         assert!(result.is_ok(), "Eval failed: {:?}", result);
-        if let ControlState::Return(Value::String(s)) = interp.state() {
+        if let Ok(Value::String(s)) = result {
             assert_eq!(s, "big");
         } else {
-            panic!("Expected Return(String(\"big\")), got {:?}", interp.state());
+            panic!("Expected String(\"big\"), got {:?}", result);
         }
     }
 
@@ -413,18 +319,16 @@ mod tests {
         }"#;
         let result = interp.eval(code);
         assert!(result.is_ok(), "Eval failed: {:?}", result);
-        if let ControlState::Return(Value::String(s)) = interp.state() {
+        if let Ok(Value::String(s)) = result {
             assert_eq!(s, "Hello world!");
         } else {
-            panic!("Expected Return(String(\"Hello world!\")), got {:?}", interp.state());
+            panic!("Expected String(\"Hello world!\"), got {:?}", result);
         }
     }
 
     #[test]
-    fn test_think_block_yields() {
+    fn test_think_block_returns_placeholder() {
         let mut interp = Interpreter::new();
-        // Note: Parser doesn't preserve whitespace perfectly in prompt blocks
-        // This will be improved in later phases
         let code = r#"{
             var topic = "Rust"
             think {
@@ -434,19 +338,33 @@ mod tests {
         let result = interp.eval(code);
         assert!(result.is_ok(), "Eval failed: {:?}", result);
 
-        // Should yield with the interpolated prompt
-        match interp.state() {
-            ControlState::Yield { op, prompt, bindings, expect } => {
-                assert_eq!(*op, LlmOp::Think);
-                // Parser currently doesn't preserve all whitespace, so we get:
-                assert!(prompt.contains("Explain"));
-                assert!(prompt.contains("Rust"));
-                assert!(prompt.contains("in one sentence"));
-                assert_eq!(expect, "string");
-                // Check that 'topic' is in bindings
-                assert_eq!(bindings.get("topic"), Some(&Value::String("Rust".to_string())));
+        // In Phase 3, think blocks return a placeholder object with the prompt
+        if let Ok(Value::Object(obj)) = result {
+            let prompt = obj.get("__think_prompt").expect("Missing __think_prompt");
+            if let Value::String(s) = prompt {
+                assert!(s.contains("Explain"));
+                assert!(s.contains("Rust"));
+                assert!(s.contains("in one sentence"));
+            } else {
+                panic!("Expected prompt string, got {:?}", prompt);
             }
-            other => panic!("Expected Yield state, got {:?}", other),
+        } else {
+            panic!("Expected Object with __think_prompt, got {:?}", result);
+        }
+    }
+
+    #[test]
+    fn test_exception_propagation() {
+        let mut interp = Interpreter::new();
+        let code = r#"{
+            throw "oops"
+        }"#;
+        let result = interp.eval(code);
+        match result {
+            Err(Error::Exception(Value::String(s))) => {
+                assert_eq!(s, "oops");
+            }
+            other => panic!("Expected Exception, got {:?}", other),
         }
     }
 }

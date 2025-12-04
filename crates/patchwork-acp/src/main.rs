@@ -13,7 +13,7 @@ use sacp_proxy::{AcpProxyExt, JrCxExt, McpServiceRegistry};
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 use tracing_subscriber::EnvFilter;
 
-use patchwork_eval::{ControlState, Interpreter};
+use patchwork_eval::{Error as EvalError, Interpreter, Value};
 
 /// Session state for tracking active evaluations.
 struct Session {
@@ -127,47 +127,41 @@ async fn handle_prompt(
     // Create interpreter and evaluate
     let mut interp = Interpreter::new();
     match interp.eval(&text) {
-        Ok(state) => {
-            match state {
-                ControlState::Return(value) => {
-                    tracing::info!("Patchwork code completed: {:?}", value);
-                    // For now, just respond with a success message
-                    // In Phase 3, we'll construct a proper response
-                    let response = create_text_response(format!(
-                        "Patchwork execution completed: {}",
-                        value
-                    ));
-                    cx.respond(response)?;
-                }
-                ControlState::Throw(value) => {
-                    tracing::error!("Patchwork code threw: {:?}", value);
-                    cx.respond_with_error(
-                        sacp::Error::internal_error()
-                            .with_data(format!("Patchwork error: {}", value)),
-                    )?;
-                }
-                ControlState::Yield { prompt, .. } => {
-                    tracing::info!("Patchwork code yielded for LLM: {}", prompt);
-                    // Store interpreter for resume
+        Ok(value) => {
+            tracing::info!("Patchwork code completed: {:?}", value);
+
+            // Check if this is a think block placeholder (Phase 3 behavior)
+            // In Phase 5, think blocks will block on channels instead.
+            if let Value::Object(ref obj) = value {
+                if obj.contains_key("__think_prompt") {
+                    // Store interpreter for later use (when we implement blocking)
                     {
                         let mut proxy = proxy.lock().unwrap();
                         let session = proxy.get_or_create_session(&session_id);
                         session.store_interpreter(interp);
                     }
-                    // TODO: In Phase 3, forward the prompt to successor
-                    cx.respond_with_error(
-                        sacp::Error::internal_error()
-                            .with_data("Think blocks not yet implemented"),
-                    )?;
-                }
-                ControlState::Eval => {
-                    // Shouldn't happen after eval() returns
-                    cx.respond_with_error(
-                        sacp::Error::internal_error()
-                            .with_data("Unexpected Eval state after execution"),
-                    )?;
+                    // For now, respond with placeholder info
+                    let response = create_text_response(
+                        "Patchwork execution reached think block (not yet connected to LLM)".to_string()
+                    );
+                    cx.respond(response)?;
+                    return Ok(());
                 }
             }
+
+            // Normal completion
+            let response = create_text_response(format!(
+                "Patchwork execution completed: {}",
+                value
+            ));
+            cx.respond(response)?;
+        }
+        Err(EvalError::Exception(value)) => {
+            tracing::error!("Patchwork code threw exception: {:?}", value);
+            cx.respond_with_error(
+                sacp::Error::internal_error()
+                    .with_data(format!("Patchwork exception: {}", value)),
+            )?;
         }
         Err(e) => {
             tracing::error!("Patchwork parse/eval error: {}", e);
