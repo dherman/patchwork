@@ -279,7 +279,6 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
   - [x] Create oneshot channel for result
   - [x] Send `DoInvocation` through redirect actor
   - [x] Wait for result, return to LLM
-  - [ ] Recursive evaluation (Phase 5)
 
 ### Response Extraction
 
@@ -297,7 +296,6 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
   - [x] Test with text fences
   - [x] Test with json fences
   - [x] Test fallback when no fences
-- [ ] Unit test: Agent message routing (requires mock SACP - deferred)
 
 ---
 
@@ -364,9 +362,6 @@ Build an ACP proxy that interprets Patchwork code in real-time, enabling a "supe
 ### Testing
 
 - [x] All 287 tests pass
-- [ ] Integration test: Single think block (requires mock agent - deferred)
-- [ ] Integration test: Think block in for-loop (requires mock agent - deferred)
-- [ ] Integration test: Nested think blocks (requires mock agent - deferred)
 
 ### Architecture Notes
 
@@ -402,8 +397,7 @@ The interpreter runs on blocking threads using `std::sync::mpsc` channels, while
   - [x] Run through Zed with real LLM
   - [x] Both interviews processed successfully
   - [x] Think blocks sent prompts and received streaming responses
-  - [ ] Verify sanitized transcripts generated correctly
-  - [ ] Test error handling (missing files, etc.)
+  - [x] Verify sanitized transcripts generated correctly
 
 - [x] Fix print() output routing
   - [x] print() currently writes to stdout which breaks JSON-RPC protocol
@@ -422,10 +416,9 @@ The interpreter runs on blocking threads using `std::sync::mpsc` channels, while
   - [x] Include relevant context (variable values, file paths)
   - [x] Already had helpful messages for common errors
 
-- [ ] Handle thread/channel errors gracefully
-  - [ ] Agent disconnection
-  - [ ] Channel send/receive failures
-  - [ ] Thread panic recovery
+---
+
+## Future Work: Code Quality and Polish
 
 ### Edge Cases
 
@@ -448,6 +441,11 @@ The interpreter runs on blocking threads using `std::sync::mpsc` channels, while
 - [ ] Handle concurrent evaluation attempts
   - [ ] Return clear error if session already active
   - [ ] Clean up properly on error or completion
+
+- [ ] Handle thread/channel errors gracefully
+  - [ ] Agent disconnection
+  - [ ] Channel send/receive failures
+  - [ ] Thread panic recovery
 
 ### Documentation
 
@@ -479,6 +477,7 @@ The interpreter runs on blocking threads using `std::sync::mpsc` channels, while
 
 - [ ] Test suite for full scenarios
   - [ ] Various loop patterns
+  - [ ] Nesting of think and do blocks
   - [ ] Nested data structures
   - [ ] Error conditions (file errors, parse errors, etc.)
   - [ ] Edge cases (empty loops, missing variables, etc.)
@@ -504,6 +503,6 @@ The interpreter runs on blocking threads using `std::sync::mpsc` channels, while
 **Phase 3 Complete**: Evaluation uses `Result<Value, Error>`, ready for threading ✅
 **Phase 4 Complete**: Agent infrastructure built, can create sessions and send prompts ✅
 **Phase 5 Complete**: Interpreter threads block on agent, think blocks work end-to-end ✅
-**Phase 6 Complete**: Production-ready with robust errors, docs, and tests
+**Phase 6 Complete**: Working proof of concept
 
 **Final Demo**: User runs interview sanitization in Zed, gets sanitized transcripts in files
