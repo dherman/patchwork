@@ -3,6 +3,7 @@
 - [Introduction](./introduction.md)
 - [The Value System](./values.md)
 - [The Runtime](./runtime.md)
+- [The Threading Model](./threading.md)
 - [An Example Program](./example.md)
 - [The Evaluator](./evaluator.md)
 - [Think Blocks](./think-blocks.md)

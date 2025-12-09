@@ -54,7 +54,23 @@ Niko's threadbare documentation (`docs/tmp/threadbare/md/`) demonstrates effecti
 **Diagrams**:
 - Scope stack visualization (graph)
 
-### 4. An Example Program
+### 4. The Threading Model
+
+**Goal**: Give readers a clear map of what threads/tasks exist, their lifetimes, and naming.
+
+**Content**:
+- Overview diagram showing all threads/tasks and their relationships
+- Naming glossary: successor, redirect actor, evaluator thread, think handler
+- Lifetime matrix: when each component is created and destroyed
+- Why synchronous evaluation (simplicity, natural blocking on think)
+- Why "actor" for redirect (the actor pattern, message-based routing)
+- The sync/async boundary: how the agent bridges the evaluator to the LLM world
+
+**Diagrams**:
+- Component/thread overview (graph showing process boundaries and lifetimes)
+- Sync/async boundary sequence diagram
+
+### 5. An Example Program
 
 **Goal**: Provide a concrete program before diving into execution details.
 
@@ -63,7 +79,7 @@ Niko's threadbare documentation (`docs/tmp/threadbare/md/`) demonstrates effecti
 - Walk through what it does conceptually before showing how
 - Similar to Niko's "An Example" chapter - ground the reader before mechanics
 
-### 5. The Evaluator
+### 6. The Evaluator
 
 **Goal**: How expressions and statements are evaluated.
 
@@ -76,7 +92,7 @@ Niko's threadbare documentation (`docs/tmp/threadbare/md/`) demonstrates effecti
 **Diagrams**:
 - Simple expression evaluation flow (sequence diagram)
 
-### 6. Think Blocks
+### 7. Think Blocks
 
 **Goal**: The core innovation - blocking on LLM responses.
 
@@ -88,7 +104,7 @@ Niko's threadbare documentation (`docs/tmp/threadbare/md/`) demonstrates effecti
 **Diagrams**:
 - Interpreter blocking on channel (sequence diagram)
 
-### 7. The Agent
+### 8. The Agent
 
 **Goal**: Bridge between sync interpreter and async LLM sessions.
 
@@ -102,7 +118,7 @@ Niko's threadbare documentation (`docs/tmp/threadbare/md/`) demonstrates effecti
 - Full think block execution (sequence diagram with multiple participants)
 - Agent component architecture (graph)
 
-### 8. The ACP Proxy
+### 9. The ACP Proxy
 
 **Goal**: How Patchwork integrates with the ACP protocol.
 
@@ -115,7 +131,7 @@ Niko's threadbare documentation (`docs/tmp/threadbare/md/`) demonstrates effecti
 **Diagrams**:
 - Component architecture showing proxy in the message chain (graph)
 
-### 9. Nested Think Blocks (Advanced)
+### 10. Nested Think Blocks (Advanced)
 
 **Goal**: Deep dive into the recursive interplay between interpreter and LLM.
 
@@ -155,6 +171,7 @@ docs/arch/
 │   ├── introduction.md
 │   ├── values.md
 │   ├── runtime.md
+│   ├── threading.md
 │   ├── example.md
 │   ├── evaluator.md
 │   ├── think-blocks.md

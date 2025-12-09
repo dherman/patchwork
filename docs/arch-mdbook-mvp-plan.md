@@ -41,12 +41,21 @@ Implementation plan for the architecture book. Goal: explain the current archite
 
 - [x] **The ACP Proxy** - Prompt detection, evaluation spawning, print forwarding
 
-### Phase 6: Advanced Chapter (Optional)
+### Phase 6: Threading Model Chapter
+
+- [x] **The Threading Model** - Threads/tasks overview, naming glossary, lifetimes, sync/async boundary
+  - Overview diagram showing all threads/tasks and their relationships
+  - Naming glossary: successor, redirect actor, evaluator thread, think handler
+  - Lifetime matrix: when each component is created and destroyed
+  - Why synchronous evaluation, why "actor" pattern for redirect
+  - The sync/async boundary diagram
+
+### Phase 7: Advanced Chapter (Optional)
 
 - [ ] **Nested Think Blocks** - Stack-based routing, recursive interplay
   - Only include if time permits and the earlier chapters are solid
 
-### Phase 7: Review
+### Phase 8: Review
 
 - [ ] Read through for consistency and flow
 - [ ] Verify all mermaid diagrams render correctly
