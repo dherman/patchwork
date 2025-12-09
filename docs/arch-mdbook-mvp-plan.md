@@ -39,7 +39,7 @@ Implementation plan for the architecture book. Goal: explain the current archite
 
 ### Phase 5: Integration Chapter
 
-- [ ] **The ACP Proxy** - Prompt detection, evaluation spawning, print forwarding
+- [x] **The ACP Proxy** - Prompt detection, evaluation spawning, print forwarding
 
 ### Phase 6: Advanced Chapter (Optional)
 
