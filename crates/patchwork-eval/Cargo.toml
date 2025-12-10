@@ -3,6 +3,8 @@ name = "patchwork-eval"
 version = "0.1.0"
 edition = "2021"
 description = "Patchwork language interpreter with suspend/resume for LLM integration"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/patchwork-lang/patchwork"
 
 [dependencies]
 patchwork-parser = { version = "0.1.0", path = "../patchwork-parser" }

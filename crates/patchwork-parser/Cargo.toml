@@ -2,6 +2,9 @@
 name = "patchwork-parser"
 version = "0.1.0"
 edition = "2021"
+description = "Parser for the Patchwork agentic scripting language"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/patchwork-lang/patchwork"
 
 [dependencies]
 patchwork-lexer = { version = "0.1.0", path = "../patchwork-lexer" }

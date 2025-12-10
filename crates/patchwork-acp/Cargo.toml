@@ -3,6 +3,8 @@ name = "patchwork-acp"
 version = "0.1.0"
 edition = "2021"
 description = "ACP proxy for executing Patchwork code with LLM integration"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/patchwork-lang/patchwork"
 
 [[bin]]
 name = "patchwork-acp"
