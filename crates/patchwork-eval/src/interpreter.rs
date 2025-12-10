@@ -10,7 +10,7 @@ use patchwork_parser::ast::{Expr, Statement};
 use crate::agent::AgentHandle;
 use crate::error::Error;
 use crate::eval;
-use crate::runtime::{PlanReporter, PrintSink, Runtime};
+use crate::runtime::{PlanReporter, PrintSink, Runtime, ThoughtReporter};
 use crate::value::Value;
 
 /// The Patchwork interpreter.
@@ -88,6 +88,13 @@ impl Interpreter {
     /// When set, for loops will report their progress to this channel.
     pub fn set_plan_reporter(&mut self, reporter: PlanReporter) {
         self.runtime.set_plan_reporter(reporter);
+    }
+
+    /// Set a thought reporter for streaming agent reasoning.
+    ///
+    /// When set, constructs like for loops will emit thought chunks.
+    pub fn set_thought_reporter(&mut self, reporter: ThoughtReporter) {
+        self.runtime.set_thought_reporter(reporter);
     }
 
     /// Evaluate Patchwork code.
@@ -592,5 +599,36 @@ mod tests {
         assert_eq!(last.entries[0].content, "a");
         assert_eq!(last.entries[1].content, "b");
         assert_eq!(last.entries[2].content, "c");
+    }
+
+    #[test]
+    fn test_for_loop_thought_reporting() {
+        use crate::runtime::ThoughtChunk;
+        use std::sync::mpsc;
+
+        let (thought_tx, thought_rx) = mpsc::channel::<ThoughtChunk>();
+        let mut interp = Interpreter::new();
+        interp.set_thought_reporter(thought_tx);
+
+        let code = r#"{
+            var interviews = ["alice", "bob", "charlie"]
+            for var interview in interviews {
+                interview
+            }
+        }"#;
+
+        let result = interp.eval(code);
+        assert!(result.is_ok(), "Eval failed: {:?}", result);
+
+        // Collect all thought chunks
+        let chunks: Vec<ThoughtChunk> = thought_rx.try_iter().collect();
+
+        // Should have exactly one thought chunk before the loop
+        assert_eq!(chunks.len(), 1, "Expected 1 thought chunk, got {}", chunks.len());
+
+        // Check the thought message uses the variable name
+        let thought = &chunks[0].text;
+        assert!(thought.contains("3"), "Should mention count: {}", thought);
+        assert!(thought.contains("interview"), "Should mention variable name: {}", thought);
     }
 }

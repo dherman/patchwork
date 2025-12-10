@@ -36,6 +36,16 @@ pub struct PlanUpdate {
 /// A sink for plan updates, allowing the ACP proxy to receive execution progress.
 pub type PlanReporter = Sender<PlanUpdate>;
 
+/// A thought chunk message sent from the interpreter.
+#[derive(Debug, Clone)]
+pub struct ThoughtChunk {
+    /// The text content of the thought.
+    pub text: String,
+}
+
+/// A sink for thought chunks, allowing the ACP proxy to stream agent reasoning.
+pub type ThoughtReporter = Sender<ThoughtChunk>;
+
 /// The runtime environment for executing Patchwork code.
 ///
 /// Holds variable bindings and execution context like the working directory.
@@ -50,6 +60,8 @@ pub struct Runtime {
     print_sink: Option<PrintSink>,
     /// Optional sink for plan updates. If None, no plan reporting.
     plan_reporter: Option<PlanReporter>,
+    /// Optional sink for thought chunks. If None, no thought streaming.
+    thought_reporter: Option<ThoughtReporter>,
 }
 
 impl Runtime {
@@ -60,6 +72,7 @@ impl Runtime {
             working_dir,
             print_sink: None,
             plan_reporter: None,
+            thought_reporter: None,
         }
     }
 
@@ -70,6 +83,7 @@ impl Runtime {
             working_dir,
             print_sink: Some(print_sink),
             plan_reporter: None,
+            thought_reporter: None,
         }
     }
 
@@ -81,6 +95,11 @@ impl Runtime {
     /// Set the plan reporter for execution progress updates.
     pub fn set_plan_reporter(&mut self, reporter: PlanReporter) {
         self.plan_reporter = Some(reporter);
+    }
+
+    /// Set the thought reporter for streaming agent reasoning.
+    pub fn set_thought_reporter(&mut self, reporter: ThoughtReporter) {
+        self.thought_reporter = Some(reporter);
     }
 
     /// Send a print message to the sink, or stdout if no sink is configured.
@@ -102,6 +121,16 @@ impl Runtime {
         if let Some(ref reporter) = self.plan_reporter {
             // Ignore errors - if the channel is disconnected, we just don't report
             let _ = reporter.send(update);
+        }
+    }
+
+    /// Send a thought chunk to the reporter, if configured.
+    ///
+    /// Silently does nothing if no reporter is configured.
+    pub fn report_thought(&self, text: String) {
+        if let Some(ref reporter) = self.thought_reporter {
+            // Ignore errors - if the channel is disconnected, we just don't report
+            let _ = reporter.send(ThoughtChunk { text });
         }
     }
 
@@ -174,6 +203,7 @@ impl Default for Runtime {
             working_dir: std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")),
             print_sink: None,
             plan_reporter: None,
+            thought_reporter: None,
         }
     }
 }

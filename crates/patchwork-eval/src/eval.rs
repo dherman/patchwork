@@ -99,6 +99,12 @@ pub fn eval_statement(
                 }
             };
 
+            // Emit a thought chunk announcing the loop
+            if !items.is_empty() {
+                let thought = generate_loop_thought(var, items.len());
+                runtime.report_thought(thought);
+            }
+
             // Build the initial plan with all entries as pending
             let item_strings: Vec<String> = items.iter()
                 .map(|v| v.to_string_value())
@@ -930,6 +936,23 @@ fn type_name(value: &Value) -> &'static str {
         Value::Array(_) => "array",
         Value::Object(_) => "object",
     }
+}
+
+/// Generate a human-friendly thought message for a for loop.
+///
+/// Converts the variable name into a natural phrase like:
+/// - "interview" -> "Going through each interview..."
+/// - "file" -> "Going through each file..."
+fn generate_loop_thought(var_name: &str, count: usize) -> String {
+    let item_word = match count {
+        1 => var_name.to_string(),
+        _ => {
+            // Simple pluralization - just add 's' for now
+            // Could be made smarter later
+            format!("{}s", var_name)
+        }
+    };
+    format!("Going through {} {}...", count, item_word)
 }
 
 #[cfg(test)]

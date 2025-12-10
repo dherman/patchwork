@@ -22,6 +22,7 @@ use tracing_subscriber::EnvFilter;
 use patchwork_eval::{
     AgentHandle, Error as EvalError, Interpreter,
     PlanReporter, PlanUpdate as EvalPlanUpdate, PrintSink,
+    ThoughtChunk as EvalThoughtChunk, ThoughtReporter,
 };
 
 use crate::agent::{PerSessionMessage, RedirectMessage};
@@ -192,13 +193,18 @@ async fn run_patchwork_evaluation(
     let (plan_tx, plan_rx): (PlanReporter, std::sync::mpsc::Receiver<EvalPlanUpdate>) =
         std::sync::mpsc::channel();
 
-    // Create interpreter with agent handle, print sink, and plan reporter
+    // Create a channel for thought chunks
+    let (thought_tx, thought_rx): (ThoughtReporter, std::sync::mpsc::Receiver<EvalThoughtChunk>) =
+        std::sync::mpsc::channel();
+
+    // Create interpreter with agent handle, print sink, plan reporter, and thought reporter
     let mut interp = match agent_handle {
         Some(handle) => Interpreter::with_agent(handle),
         None => Interpreter::new(),
     };
     interp.set_print_sink(print_tx);
     interp.set_plan_reporter(plan_tx);
+    interp.set_thought_reporter(thought_tx);
 
     // Spawn a task to forward print messages as notifications
     let connection_cx = cx.connection_cx().clone();
@@ -214,6 +220,13 @@ async fn run_patchwork_evaluation(
         forward_plan_updates_to_notifications(plan_rx, &connection_cx_for_plans, &session_id_for_plans)
     });
 
+    // Spawn a task to forward thought chunks as notifications
+    let connection_cx_for_thoughts = cx.connection_cx().clone();
+    let session_id_for_thoughts = session_id.clone();
+    let thought_forwarder = tokio::task::spawn_blocking(move || {
+        forward_thought_chunks_to_notifications(thought_rx, &connection_cx_for_thoughts, &session_id_for_thoughts)
+    });
+
     // Evaluate on a blocking thread since interpreter may block on channels
     let eval_result = tokio::task::spawn_blocking(move || interp.eval(&text))
         .await
@@ -222,6 +235,7 @@ async fn run_patchwork_evaluation(
     // Wait for forwarders to complete (they will finish when channels are dropped)
     let _ = print_forwarder.await;
     let _ = plan_forwarder.await;
+    let _ = thought_forwarder.await;
 
     // End the evaluation regardless of result
     {
@@ -330,6 +344,37 @@ fn forward_plan_updates_to_notifications(
 
         if let Err(e) = connection_cx.send_notification(notification) {
             tracing::warn!("Failed to send plan notification: {}", e);
+            break;
+        }
+    }
+}
+
+/// Forward thought chunks from the interpreter to ACP notifications.
+///
+/// This runs in a blocking context and sends each thought chunk as a SessionUpdate::AgentThoughtChunk.
+fn forward_thought_chunks_to_notifications(
+    rx: std::sync::mpsc::Receiver<EvalThoughtChunk>,
+    connection_cx: &JrConnectionCx,
+    session_id: &str,
+) {
+    while let Ok(chunk) = rx.recv() {
+        tracing::debug!("Forwarding thought chunk: {}", chunk.text);
+
+        let notification = SessionNotification {
+            session_id: session_id.to_string().into(),
+            update: SessionUpdate::AgentThoughtChunk(ContentChunk {
+                content: ContentBlock::Text(TextContent {
+                    annotations: None,
+                    text: chunk.text,
+                    meta: None,
+                }),
+                meta: None,
+            }),
+            meta: None,
+        };
+
+        if let Err(e) = connection_cx.send_notification(notification) {
+            tracing::warn!("Failed to send thought notification: {}", e);
             break;
         }
     }
