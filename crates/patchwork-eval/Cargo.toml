@@ -5,7 +5,7 @@ edition = "2021"
 description = "Patchwork language interpreter with suspend/resume for LLM integration"
 
 [dependencies]
-patchwork-parser = { path = "../patchwork-parser" }
+patchwork-parser = { version = "0.1.0", path = "../patchwork-parser" }
 
 serde_json = "1.0"
 thiserror = "2.0"

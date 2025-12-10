@@ -9,7 +9,7 @@ name = "patchwork-acp"
 path = "src/main.rs"
 
 [dependencies]
-patchwork-eval = { path = "../patchwork-eval" }
+patchwork-eval = { version = "0.1.0", path = "../patchwork-eval" }
 
 # SACP framework
 sacp = "1.1"
