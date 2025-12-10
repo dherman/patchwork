@@ -93,6 +93,9 @@ gantt
     dateFormat X
     axisFormat %s
 
+    section External
+    Successor Process     :active, 0, 100
+
     section Process Lifetime
     Proxy Message Loop    :0, 100
     Redirect Actor        :0, 100
